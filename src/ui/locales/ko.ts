@@ -130,14 +130,14 @@ export default {
   creator: "생성자",
   confirmJoin: "이 라운드 참여",
   joinAsRecorder:
-    "먼저 기록 참여자로 등록됩니다. 플레이어 연결은 다음 단계에서 관리합니다.",
+    "먼저 기록 참여자로 등록됩니다. 실제 플레이어 연결은 플레이어 관리에서 할 수 있어요.",
   participants: "참여 사용자",
   sendInvite: "초대 보내기",
   inviteCode: "동반자의 개인 코드",
   inviteSent: "초대를 보냈습니다.",
   inviteHelp: "초대받은 사람의 홈에 카드가 표시됩니다.",
   stage2RoundHelp:
-    "지금은 라운드 생성·참여까지 이용할 수 있어요. 플레이어 관리, 점수 입력과 종료는 다음 단계에서 연결합니다.",
+    "플레이어와 내 입력 대상을 관리할 수 있어요. 점수 입력과 종료는 다음 단계에서 연결합니다.",
   pendingRound: "진행하던 라운드 작업",
   resumeRound: "이어서 처리",
   roundReview: "라운드 최종 확인",
@@ -182,4 +182,87 @@ export default {
   invalid_request: "입력 내용을 확인해 주세요.",
   course_list_full: "내 골프장은 최대 100개까지 보관할 수 있습니다.",
   not_found: "항목을 찾을 수 없습니다.",
+  playerManagement: "플레이어 관리",
+  inputTargets: "내 입력 대상",
+  managePlayer: "관리",
+  unregistered: "미등록 플레이어",
+  linkedPlayer: "사용자 연결됨",
+  linkPlayer: "사용자 연결",
+  unlinkPlayer: "연결 해제",
+  renamePlayer: "임시 이름 수정",
+  deletePlayer: "플레이어 삭제",
+  temporaryName: "임시 이름",
+  playerName: "플레이어 이름",
+  playerCode: "개인 코드 또는 개인 QR 내용",
+  findPlayer: "사용자 확인",
+  confirmLink: "이 사용자로 연결",
+  linkSelf: "나로 연결",
+  linkHelp:
+    "닉네임과 개인 코드를 확인하세요. 연결만으로 기록 참여자가 추가되거나 광고가 나오지는 않아요.",
+  unlinkHelp:
+    "사용자 연결만 해제합니다. 플레이어 자리와 기존 스코어는 그대로 유지됩니다.",
+  unlinkConfirm: "이 사용자와의 연결을 해제할까요? 스코어는 유지됩니다.",
+  savePlayer: "플레이어 저장",
+  addPlayerName: "추가할 플레이어 이름",
+  deleteImpact: "삭제 영향 확인",
+  deleteImpactHelp:
+    "연결이나 기록이 있는 플레이어는 바로 삭제할 수 없어요. 문제가 있는 기록을 임의로 지우지 않습니다.",
+  scoreCount: "저장된 홀 수",
+  deliveryCount: "기록 보내기 관계",
+  receiptCount: "기록 수신 관계",
+  targetCount: "저장된 입력 목록 포함 수",
+  deleteTargetHelp:
+    "삭제하면 이 플레이어는 개인별 입력 대상 목록에서도 빠집니다.",
+  confirmDeletePlayer: "확인 후 삭제",
+  lastPlayerHelp: "라운드에는 실제 플레이어가 최소 한 명 필요합니다.",
+  playersReadOnly:
+    "종료된 라운드에서는 미등록 플레이어의 이름만 변경할 수 있어요.",
+  playerDraftChanged:
+    "다른 참여자가 정보를 변경했습니다. 작성 내용은 남겨 두었어요. 최신 내용을 확인한 뒤 다시 수정해 주세요.",
+  targetDraftChanged:
+    "플레이어나 저장된 입력 목록이 바뀌었습니다. 선택한 초안은 유지됩니다. 최신 목록을 불러와 다시 확인해 주세요.",
+  reloadPlayers: "최신 내용으로 다시 열기",
+  reloadDraftConfirm: "작성 중인 내용을 최신 정보로 바꿀까요?",
+  selectedPlayers: "선택된 플레이어",
+  unselectedPlayers: "미선택 플레이어",
+  selectPlayer: "입력 대상으로 선택",
+  unselectPlayer: "입력 대상에서 제외",
+  noSelectedPlayers:
+    "선택된 플레이어가 없습니다. 관람만 할 때는 비워 두어도 됩니다.",
+  allPlayersSelected: "모든 플레이어를 선택했습니다.",
+  targetsHelp:
+    "이 목록과 순서는 나의 스코어 입력 화면에만 적용됩니다. 다른 참여자의 목록이나 순위는 바뀌지 않아요.",
+  targetsDefault:
+    "처음에는 모든 플레이어가 선택됩니다. 저장한 이후 새 플레이어는 직접 선택해 주세요.",
+  saveTargets: "내 입력 대상 저장",
+  targetsSaved: "내 입력 대상과 순서를 저장했습니다.",
+  unsavedTargets: "아직 저장하지 않은 선택입니다.",
+  selectedCount: "선택 인원",
+  qrScan: "개인 QR 스캔",
+  qrScanHelp: "동반자의 개인 QR을 화면 안에 맞춰 주세요.",
+  cameraHelp:
+    "개인 QR을 읽으려면 카메라 접근이 필요합니다. 사진이나 영상을 저장하지 않습니다.",
+  allowCamera: "카메라 허용",
+  cameraUnavailable:
+    "카메라를 사용할 수 없습니다. 권한을 확인하거나 개인 코드를 직접 입력해 주세요.",
+  closeScan: "닫고 코드 입력",
+  invalid_personal_code: "개인 코드 또는 Yamone Golf 개인 QR을 확인해 주세요.",
+  player_not_found: "이 플레이어는 삭제되었거나 찾을 수 없습니다.",
+  player_changed: "플레이어가 변경되었습니다. 최신 내용을 확인해 주세요.",
+  player_limit: "플레이어는 최대 8명입니다. 최신 목록을 확인해 주세요.",
+  player_already_linked:
+    "이미 사용자가 연결된 자리입니다. 먼저 연결을 확인해 주세요.",
+  user_already_player:
+    "이 사용자는 이 라운드의 다른 플레이어에 연결되어 있습니다.",
+  player_link_changed: "사용자 연결 상태가 바뀌었습니다. 다시 확인해 주세요.",
+  linked_name_locked:
+    "연결된 플레이어는 사용자 닉네임을 표시합니다. 임시 이름 수정은 연결 해제 후 가능합니다.",
+  targets_changed:
+    "플레이어나 입력 대상 목록이 바뀌었습니다. 최신 내용을 확인해 주세요.",
+  invalid_targets: "입력 대상 목록을 확인해 주세요.",
+  player_protected:
+    "사용자 연결이나 스코어·기록 관계가 있어 삭제할 수 없습니다.",
+  delete_changed:
+    "삭제 확인 이후 상태가 바뀌었습니다. 영향을 다시 확인해 주세요.",
+  last_player: "마지막 플레이어는 삭제할 수 없습니다.",
 };

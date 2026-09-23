@@ -130,14 +130,14 @@ const en: Record<keyof typeof ko, string> = {
   creator: "Created by",
   confirmJoin: "Join this round",
   joinAsRecorder:
-    "You will join as a recorder. Player linking is coming in the next stage.",
+    "You will join as a recorder. Link yourself to a player in Manage players.",
   participants: "Participants",
   sendInvite: "Send invitation",
   inviteCode: "Companion’s personal code",
   inviteSent: "Invitation sent.",
   inviteHelp: "The invitation appears on their home screen.",
   stage2RoundHelp:
-    "This version supports creating and joining rounds. Player management, scoring and ending rounds come in later stages.",
+    "You can now manage players and your scoring list. Scoring and ending rounds come in later stages.",
   pendingRound: "Pending round action",
   resumeRound: "Resume action",
   roundReview: "Review round action",
@@ -180,5 +180,87 @@ const en: Record<keyof typeof ko, string> = {
   invalid_request: "Check your input.",
   course_list_full: "You can keep up to 100 courses.",
   not_found: "Item not found.",
+  playerManagement: "Manage players",
+  inputTargets: "My scoring players",
+  managePlayer: "Manage",
+  unregistered: "Unlinked player",
+  linkedPlayer: "Linked user",
+  linkPlayer: "Link a user",
+  unlinkPlayer: "Unlink user",
+  renamePlayer: "Edit temporary name",
+  deletePlayer: "Delete player",
+  temporaryName: "Temporary name",
+  playerName: "Player name",
+  playerCode: "Personal code or QR text",
+  findPlayer: "Find user",
+  confirmLink: "Link this user",
+  linkSelf: "Link myself",
+  linkHelp:
+    "Check the nickname and personal code. Linking does not add a recorder or show an ad.",
+  unlinkHelp:
+    "Only the user link is removed. This player slot and its existing scores stay.",
+  unlinkConfirm: "Unlink this user? Existing scores will stay.",
+  savePlayer: "Save player",
+  addPlayerName: "New player name",
+  deleteImpact: "Review deletion impact",
+  deleteImpactHelp:
+    "Players with a user link or records cannot be deleted here. Existing records stay safe.",
+  scoreCount: "Scored holes",
+  deliveryCount: "Record deliveries",
+  receiptCount: "Record receipts",
+  targetCount: "Saved scoring lists affected",
+  deleteTargetHelp:
+    "Deletion also removes this player from saved scoring lists.",
+  confirmDeletePlayer: "Confirm deletion",
+  lastPlayerHelp: "A round needs at least one player.",
+  playersReadOnly:
+    "After the round ends, only unlinked player names can be changed here.",
+  playerDraftChanged:
+    "Another participant changed the player data. Your draft is still here. Review the latest version before editing again.",
+  targetDraftChanged:
+    "The players or saved scoring list changed. Your draft is preserved. Load the latest list and review your choices.",
+  reloadPlayers: "Reopen latest version",
+  reloadDraftConfirm: "Replace this draft with the latest information?",
+  selectedPlayers: "Selected players",
+  unselectedPlayers: "Other players",
+  selectPlayer: "Select for scoring",
+  unselectPlayer: "Remove from scoring",
+  noSelectedPlayers:
+    "No players selected. You can leave this empty if you are only viewing.",
+  allPlayersSelected: "All players are selected.",
+  targetsHelp:
+    "This list and order apply only to your scoring screen. Other users’ lists and rankings stay unchanged.",
+  targetsDefault:
+    "All players are selected initially. After saving a custom list, select new players yourself.",
+  saveTargets: "Save my scoring players",
+  targetsSaved: "Your scoring list and order have been saved.",
+  unsavedTargets: "These choices have not been saved yet.",
+  selectedCount: "Selected players",
+  qrScan: "Scan personal QR",
+  qrScanHelp: "Point the camera at your companion’s personal QR.",
+  cameraHelp:
+    "Camera access is needed to read a personal QR. No photos or videos are saved.",
+  allowCamera: "Allow camera",
+  cameraUnavailable:
+    "The camera is unavailable. Check permissions or enter the personal code instead.",
+  closeScan: "Close and enter code",
+  invalid_personal_code: "Check the personal code or Yamone Golf personal QR.",
+  player_not_found: "This player was deleted or cannot be found.",
+  player_changed: "This player changed. Review the latest version.",
+  player_limit: "A round has up to eight players. Check the latest list.",
+  player_already_linked:
+    "This slot already has a linked user. Check the existing link.",
+  user_already_player: "This user is linked to another player in this round.",
+  player_link_changed: "The user link changed. Please check it again.",
+  linked_name_locked:
+    "A linked player displays the user’s nickname. Unlink first to set a temporary name.",
+  targets_changed:
+    "The players or scoring list changed. Review the latest version.",
+  invalid_targets: "Check the selected players.",
+  player_protected:
+    "This player has a user link, scores or record references and cannot be deleted.",
+  delete_changed:
+    "The state changed after deletion review. Check the impact again.",
+  last_player: "The last player cannot be deleted.",
 };
 export default en;

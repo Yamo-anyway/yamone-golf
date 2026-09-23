@@ -539,6 +539,22 @@ export function RoundScreen() {
               </Txt>
             ))}
           </Card>
+          <Button
+            label={t("playerManagement")}
+            testID="manage-players"
+            secondary
+            onPress={() =>
+              router.push({ pathname: "/players", params: { id } })
+            }
+          />
+          <Button
+            label={t("inputTargets")}
+            testID="input-targets"
+            secondary
+            onPress={() =>
+              router.push({ pathname: "/input-targets", params: { id } })
+            }
+          />
           <Card>
             <Txt style={{ fontWeight: "700" }}>{t("sendInvite")}</Txt>
             <Txt>{t("inviteHelp")}</Txt>

@@ -1,11 +1,12 @@
 {
   "name": "yamone-golf",
-  "version": "0.3.1",
+  "version": "0.3.2",
   "main": "expo-router/entry",
   "dependencies": {
     "@expo/metro-runtime": "~57.0.16",
     "@react-native-async-storage/async-storage": "2.2.0",
     "expo": "~57.0.24",
+    "expo-camera": "~57.0.5",
     "expo-constants": "~57.0.19",
     "expo-crypto": "~57.0.3",
     "expo-dev-client": "~57.0.19",

@@ -2,7 +2,7 @@
 
 이번 소스는 로컬 Worker와 D1에서 동작하도록 구성했습니다. 실제 계정/리소스 연결은 아직 수행하지 않았습니다. 개발 DB와 운영 DB는 분리합니다.
 
-v0.3.1에는 `0002_courses_rounds.sql`이 추가되었습니다. 기존 1단계 개발 DB에는 `npm run db:local`로 추가 마이그레이션을 적용합니다. 운영 광고가 아직 없으므로 현재 버전은 운영 출시 대상이 아닙니다.
+v0.3.2에는 `0003_players_targets.sql`이 추가되었습니다. 기존 1·2단계 개발 DB에는 `npm run db:local`로 추가 마이그레이션을 적용합니다. 운영 광고가 아직 없으므로 현재 버전은 운영 출시 대상이 아닙니다.
 
 ## 개발 서버 만들기
 
@@ -55,3 +55,5 @@ npx wrangler deploy --env production
 - [Expo SDK 57 Router](https://docs.expo.dev/versions/v57.0.0/sdk/router/)
 
 공용 골프장 순서와 개인 즐겨찾기는 분리되어 있습니다. 공용 courses에는 favorite 속성이 없고, user_courses의 관계와 sort_order만 바뀝니다. 라운드 골프장 데이터는 생성 준비 시 별도 복사본을 저장합니다.
+
+3단계는 player_slots의 버전/삭제 표시, round의 roster_version, input_target_lists/input_targets, player_mutations/player_audit를 추가합니다. 기존 슬롯은 version=1, 삭제되지 않은 상태로 유지됩니다. 개인 목록의 초기 기본값은 전체 플레이어이며 명시적 선택을 저장한 뒤에는 저장한 선택을 사용합니다.

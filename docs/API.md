@@ -1,4 +1,4 @@
-# API — v0.3.1
+# API — v0.3.2
 
 모든 응답은 Cache-Control: no-store입니다. 오류는 `{ "error": "code" }` 형식이며 화면 문자열은 앱의 ko/en 리소스에서 정합니다. 각 성공 응답의 profile은 비밀값과 해시를 포함하지 않습니다.
 
@@ -40,7 +40,7 @@
 
 생성 준비: course_id, course_version, segment_indices(1개 또는 2개, 동일 코스 반복 가능), players[{name,self}](1~8명). self=true는 최대 1명이며 현재 사용자에만 연결됩니다. 준비 당시 골프장/코스/PAR을 복사하며, 라운드 생성 후 공용 정보 수정과 독립적입니다.
 
-참여 준비: code 또는 invitation_id. 초대는 현재 사용자에게 온 pending 상태여야 합니다. 참여는 round_participants만 추가하고 기존 player_slots와 점수에는 손대지 않습니다. 플레이어 연결은 3단계입니다.
+참여 준비: code 또는 invitation_id. 초대는 현재 사용자에게 온 pending 상태여야 합니다. 참여는 round_participants만 추가하고 기존 player_slots와 점수에는 손대지 않습니다. 플레이어 연결은 아래 3단계 API로 별도로 처리합니다.
 
 같은 action_id는 같은 작업을 의미하며 첫 준비 내용이 유지됩니다. 변경한 내용으로 새 작업을 하려면 기존 보류 작업을 취소한 뒤 새 ID를 사용합니다. execute 응답 유실 시 같은 ID로 재시도하면 같은 라운드를 반환합니다.
 
@@ -55,3 +55,42 @@
 추가 오류: course_changed/list_changed/state_changed/active_round_exists/round_ended/invitation_unavailable/ad_required(409), forbidden(403), ads_not_configured(503). 오류 후 화면 초안을 임의로 지우지 않습니다.
 
 점수·종료·기록 보내기/받기·이메일 API는 후속 단계입니다.
+
+## 3단계 플레이어·개인 입력 대상 API
+
+모든 경로는 해당 라운드의 참여자만 사용할 수 있습니다. `:r`은 round_id, `:s`는 slot_id입니다. 연결만 된 비참여자는 이 API로 라운드를 조회하거나 관리할 수 없습니다.
+
+| 메서드 | 경로                                    | 입력 / 결과                                                                  |
+| ------ | --------------------------------------- | ---------------------------------------------------------------------------- |
+| GET    | /api/rounds/:r/players                  | status, roster_version, 플레이어 목록·연결 코드·참조 수                      |
+| POST   | /api/rounds/:r/players                  | mutation_id, name → 새 미등록 슬롯, 최신 목록                                |
+| POST   | /api/rounds/:r/player-lookup            | code(개인 코드 또는 정해진 QR URI) → user, linked_slot_id                    |
+| PATCH  | /api/rounds/:r/players/:s               | mutation_id, version, action, 변경 내용                                      |
+| GET    | /api/rounds/:r/players/:s/delete-impact | 사용자 연결·스코어·전송·수신·개인 목록 참조 수와 삭제 가능 여부              |
+| DELETE | /api/rounds/:r/players/:s               | mutation_id, version, roster_version, target_count → 재검사 후 삭제          |
+| GET    | /api/rounds/:r/input-targets            | 본인 목록의 version, roster_version, customized, players, 순서 있는 slot_ids |
+| PATCH  | /api/rounds/:r/input-targets            | mutation_id, version, roster_version, slot_ids → 본인 목록 전체 저장         |
+
+PATCH action:
+
+- rename: name. 미등록 슬롯만 허용하며 종료 후에도 기존 참여자가 이름을 수정할 수 있습니다.
+- link: code, confirmed_user_id. 미리 확인한 사용자를 명시합니다. 같은 라운드에서 하나의 user_id는 한 슬롯에만 연결됩니다.
+- unlink: name. 임시 이름을 지정하고 user_id만 연결 해제합니다. 슬롯 ID·스코어·이전 전송/수신 참조는 지우지 않습니다.
+
+추가·연결·해제·삭제·입력 대상 변경은 진행 중 라운드에서만 허용합니다. 종료 후 기록 받기와 함께 하는 플레이어 연결은 별도 후속 API입니다. 연결은 round_participants 또는 active_round_users를 추가하지 않고 광고도 요청하지 않습니다.
+
+삭제는 다음을 원자적으로 다시 확인합니다: 기기 활성, 참여 권한, 진행 상태, 슬롯 버전, 전체 플레이어 목록 버전, 사용자 미연결, 실제 스코어 없음, 모든 전송/수신 참조 없음, 영향받는 저장 목록 수, 최소 플레이어 1명 유지. 수신 후 개인 기록을 지운 흔적이나 취소된 전송이 있어도 단순 삭제하지 않습니다. 강제 삭제 API는 제공하지 않습니다.
+
+삭제 시 deleted_at을 기록해 슬롯 ID와 감사 이력을 보존하고 화면에서 제외합니다. 저장된 개인 목록에서는 해당 슬롯만 제거하며 영향받은 목록의 version을 증가시킵니다. 원본 플레이어 순서와 개인 입력 대상 순서는 별개입니다.
+
+개인 입력 대상은 최초 미설정 상태에서 현재 전체 슬롯을 기본 선택으로 반환합니다. 한번 저장하면 빈 배열도 명시적인 선택으로 유지합니다. 이후 새 슬롯은 사용자가 직접 선택하며, 다른 사용자 목록을 요청 파라미터로 지정할 수 없습니다. 순서 변경은 라운드 updated_at을 갱신하지 않습니다.
+
+모든 쓰기는 mutation_id별 중복 방지와 본문 해시를 사용합니다. 성공 응답 유실 후 동일 본문/ID를 재요청하면 다시 실행하지 않고 최신 목록을 반환합니다. 같은 ID에 다른 본문은 request_reused(409)입니다. 앱은 같은 화면에서 같은 변경을 재시도할 때 ID를 유지합니다. 이름 작성 중 화면 이탈에는 확인이 있으며, 앱 강제 종료까지 모든 이름 초안을 보존하는 기능은 아직 없습니다.
+
+오류: player_changed, player_link_changed, user_already_player, targets_changed, player_protected, delete_changed, last_player, player_limit, linked_name_locked(409). 충돌 응답 뒤 조회로 최신 값을 확인하며 앱 초안은 명시적인 선택 전까지 남깁니다.
+
+## 후속 점수·기록 API 통합 시 제약
+
+0003 마이그레이션의 scores/deliveries/receipts는 삭제 안전성 검사를 위한 참조 구조입니다. 3단계에는 이 테이블을 쓰는 일반 사용자 API가 없습니다. API 테스트만 기록을 넣어 삭제 보호를 확인합니다.
+
+4단계의 점수 저장은 동일 트랜잭션에서 deleted_at IS NULL, 활성 기기, 참여/입력 권한, 라운드 상태와 홀 범위를 확인해야 합니다. 삭제된 슬롯에 뒤늦게 도착한 입력을 복원해서는 안 됩니다. 점수 없음은 strokes=NULL 또는 행 부재이며 0은 저장할 수 없습니다. 7단계의 전송·수신도 수신 사용자·라운드·슬롯 관계를 함께 검증해야 합니다.

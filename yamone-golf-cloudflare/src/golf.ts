@@ -1,4 +1,16 @@
 import {
+  stmt,
+  uid,
+  revision,
+  getRound,
+  member,
+  atomic,
+  liveCheck,
+  type Round,
+  type Check,
+} from "./round-store";
+import { playersRoute } from "./players";
+import {
   ApiError,
   authenticate,
   body,
@@ -19,16 +31,6 @@ type Course = {
   segments_json: string;
   version: number;
 };
-type Round = {
-  round_id: string;
-  creator_id: string;
-  join_code: string;
-  course_snapshot: string;
-  hole_count: number;
-  status: string;
-  created_at: number;
-  updated_at: number;
-};
 type Action = {
   action_id: string;
   user_id: string;
@@ -38,17 +40,6 @@ type Action = {
   ad_source: string | null;
   ad_settled_at: number | null;
   completed_round_id: string | null;
-};
-type Check = { sql: string; args?: (string | number | null)[] };
-const stmt = (env: Env, sql: string, ...args: (string | number | null)[]) =>
-  env.DB.prepare(sql).bind(...args);
-const uid = (v: unknown) => {
-  if (
-    typeof v !== "string" ||
-    !/^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/i.test(v)
-  )
-    throw new ApiError("invalid_request");
-  return v;
 };
 function text(v: unknown, max: number, optional = false) {
   if (typeof v !== "string") throw new ApiError("invalid_course");
@@ -87,11 +78,6 @@ function courseInput(b: Record<string, unknown>) {
     segments,
   };
 }
-function revision(v: unknown) {
-  if (!Number.isInteger(v) || Number(v) < 0)
-    throw new ApiError("invalid_request");
-  return Number(v);
-}
 function courseView(c: Course) {
   const { segments_json, ...rest } = c;
   return { ...rest, segments: JSON.parse(segments_json) as Segment[] };
@@ -112,29 +98,9 @@ async function activeRound(env: Env, user: string) {
     user,
   ).first<Round>();
 }
-async function getRound(env: Env, id: string) {
-  const r = await stmt(
-    env,
-    "SELECT * FROM rounds WHERE round_id=?",
-    id,
-  ).first<Round>();
-  if (!r) throw new ApiError("round_not_found", 404);
-  return r;
-}
 function roundView(r: Round) {
   const { course_snapshot, ...rest } = r;
   return { ...rest, course: JSON.parse(course_snapshot) };
-}
-async function member(env: Env, d: Device, id: string) {
-  if (
-    !(await stmt(
-      env,
-      "SELECT 1 FROM round_participants WHERE round_id=? AND user_id=?",
-      id,
-      d.user_id,
-    ).first())
-  )
-    throw new ApiError("forbidden", 403);
 }
 async function action(env: Env, d: Device, id: string) {
   const a = await stmt(
@@ -145,53 +111,6 @@ async function action(env: Env, d: Device, id: string) {
   ).first<Action>();
   if (!a) throw new ApiError("not_found", 404);
   return a;
-}
-// D1 batch is transactional. Each CHECK failure rolls back all mutations, including earlier writes.
-async function atomic(
-  env: Env,
-  d: Device,
-  checks: Check[],
-  writes: D1PreparedStatement[],
-  conflict = "state_changed",
-) {
-  const all = [
-    {
-      sql: "SELECT 1 FROM devices WHERE token_hash=? AND user_id=? AND revoked_at IS NULL",
-      args: [d.token_hash, d.user_id],
-    },
-    ...checks,
-  ];
-  const ids = all.map(() => crypto.randomUUID());
-  try {
-    await env.DB.batch([
-      ...all.map((c, i) =>
-        stmt(
-          env,
-          `INSERT INTO mutation_guards(guard_id,valid) VALUES(?,CASE WHEN EXISTS(${c.sql}) THEN 1 ELSE 0 END)`,
-          ids[i],
-          ...(c.args ?? []),
-        ),
-      ),
-      ...writes,
-      ...ids.map((id) =>
-        stmt(env, "DELETE FROM mutation_guards WHERE guard_id=?", id),
-      ),
-    ]);
-  } catch (e) {
-    if (
-      !(await stmt(
-        env,
-        "SELECT 1 FROM devices WHERE token_hash=? AND revoked_at IS NULL",
-        d.token_hash,
-      ).first())
-    )
-      throw new ApiError("device_moved", 401);
-    if (String(e).includes("active_round_users.user_id"))
-      throw new ApiError("active_round_exists", 409);
-    if (/CHECK|UNIQUE|FOREIGN KEY/.test(String(e)))
-      throw new ApiError(conflict, 409);
-    throw e;
-  }
 }
 async function mine(env: Env, d: Device) {
   // A single SQL statement gives list rows and version from one snapshot.
@@ -207,10 +126,6 @@ async function mine(env: Env, d: Device) {
 const freeCheck = (d: Device): Check => ({
   sql: "SELECT 1 WHERE NOT EXISTS(SELECT 1 FROM active_round_users WHERE user_id=?)",
   args: [d.user_id],
-});
-const liveCheck = (id: string): Check => ({
-  sql: "SELECT 1 FROM rounds WHERE round_id=? AND status='active'",
-  args: [id],
 });
 async function precheck(env: Env, d: Device, a: Action) {
   if (a.completed_round_id) return;
@@ -736,7 +651,7 @@ export async function golfRoute(request: Request, env: Env): Promise<Response> {
       ).all();
       const players = await stmt(
         env,
-        "SELECT * FROM player_slots WHERE round_id=? ORDER BY position",
+        "SELECT p.*,COALESCE(u.nickname,p.name) AS name FROM player_slots p LEFT JOIN users u ON u.user_id=p.user_id WHERE p.round_id=? AND p.deleted_at IS NULL ORDER BY p.position",
         id,
       ).all();
       return json({
@@ -840,5 +755,5 @@ export async function golfRoute(request: Request, env: Env): Promise<Response> {
     );
     return json({ ok: true });
   }
-  throw new ApiError("not_found", 404);
+  return playersRoute(request, env, d);
 }
