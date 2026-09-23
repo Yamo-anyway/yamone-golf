@@ -1,7 +1,7 @@
 // UI-test API: actual Worker code + Miniflare/D1, with a fresh in-memory DB.
 // This performs no Cloudflare account access or remote deployment.
 import { createServer } from "node:http";
-import { readFile, mkdir } from "node:fs/promises";
+import { readFile, readdir, mkdir } from "node:fs/promises";
 import { build } from "esbuild";
 import { Miniflare, convertV4MiniflareOptions } from "miniflare";
 async function main() {
@@ -28,18 +28,22 @@ async function main() {
     }),
   );
   const db = await mf.getD1Database("DB");
-  const sql = await readFile(
-    "yamone-golf-cloudflare/migrations/0001_identity.sql",
-    "utf8",
-  );
-  await db.batch(
-    sql
-      .replace(/^--.*$/gm, "")
-      .split(";")
-      .map((s) => s.trim())
-      .filter(Boolean)
-      .map((s) => db.prepare(s)),
-  );
+  for (const file of (await readdir("yamone-golf-cloudflare/migrations"))
+    .filter((f) => f.endsWith(".sql"))
+    .sort()) {
+    const sql = await readFile(
+      "yamone-golf-cloudflare/migrations/" + file,
+      "utf8",
+    );
+    await db.batch(
+      sql
+        .replace(/^--.*$/gm, "")
+        .split(";")
+        .map((s) => s.trim())
+        .filter(Boolean)
+        .map((s) => db.prepare(s)),
+    );
+  }
   const server = createServer(async (req, res) => {
     try {
       const chunks: Buffer[] = [];

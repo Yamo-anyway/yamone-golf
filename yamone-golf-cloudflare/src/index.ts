@@ -1,162 +1,24 @@
-export interface Env {
-  DB: D1Database;
-  ENVIRONMENT: string;
-  ALLOWED_ORIGINS: string;
-}
-type User = {
-  user_id: string;
-  nickname: string;
-  personal_code: string;
-  language: "system" | "ko" | "en";
-  created_at: number;
-  updated_at: number;
-};
-type Device = {
-  user_id: string;
-  token_hash: string;
-  revoked_at: number | null;
-  purpose: string;
-};
-type Body = Record<string, unknown>;
-const cookieName = "ymg_device_v3";
-class ApiError extends Error {
-  constructor(
-    public code: string,
-    public status = 400,
-  ) {
-    super(code);
-  }
-}
-const json = (body: unknown, status = 200) => Response.json(body, { status });
-const now = () => Date.now();
-async function hash(value: string) {
-  const bytes = await crypto.subtle.digest(
-    "SHA-256",
-    new TextEncoder().encode(value),
-  );
-  return Array.from(new Uint8Array(bytes), (n) =>
-    n.toString(16).padStart(2, "0"),
-  ).join("");
-}
-function randomCode() {
-  const alphabet = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
-  // 32 symbols: uniform selection from cryptographic random bytes.
-  return Array.from(
-    crypto.getRandomValues(new Uint8Array(12)),
-    (b) => alphabet[b % 32],
-  ).join("");
-}
-function secret(value: unknown) {
-  if (typeof value !== "string" || !/^[a-f0-9]{64}$/.test(value))
-    throw new ApiError("invalid_device");
-  return value;
-}
-function recovery(value: unknown) {
-  if (typeof value !== "string") throw new ApiError("invalid_recovery");
-  const normalized = value.replace(/[\s-]/g, "").toUpperCase();
-  if (!/^YMGF[ABCDEFGHJKLMNPQRSTUVWXYZ23456789]{32}$/.test(normalized))
-    throw new ApiError("invalid_recovery");
-  return normalized;
-}
-function nickname(value: unknown) {
-  if (typeof value !== "string") throw new ApiError("invalid_nickname");
-  const v = value.trim().normalize("NFC");
-  if (!v || Array.from(v).length > 16 || /[\u0000-\u001f\u007f]/.test(v))
-    throw new ApiError("invalid_nickname");
-  return v;
-}
-function language(value: unknown): User["language"] {
-  if (value === undefined) return "system";
-  if (value !== "ko" && value !== "en" && value !== "system")
-    throw new ApiError("invalid_language");
-  return value;
-}
-async function body(request: Request): Promise<Body> {
-  if (!request.headers.get("Content-Type")?.startsWith("application/json"))
-    throw new ApiError("json_required", 415);
-  const reader = request.body?.getReader();
-  if (!reader) throw new ApiError("invalid_request");
-  const chunks: Uint8Array[] = [];
-  let size = 0;
-  for (;;) {
-    const { value, done } = await reader.read();
-    if (done) break;
-    size += value.byteLength;
-    if (size > 8192) {
-      await reader.cancel();
-      throw new ApiError("request_too_large", 413);
-    }
-    chunks.push(value);
-  }
-  const all = new Uint8Array(size);
-  let offset = 0;
-  for (const chunk of chunks) {
-    all.set(chunk, offset);
-    offset += chunk.length;
-  }
-  try {
-    const result: unknown = JSON.parse(new TextDecoder().decode(all));
-    if (!result || typeof result !== "object" || Array.isArray(result))
-      throw new Error();
-    return result as Body;
-  } catch {
-    throw new ApiError("invalid_request");
-  }
-}
-async function limit(
-  request: Request,
-  env: Env,
-  scope: string,
-  max: number,
-  windowMs: number,
-) {
-  // CF-Connecting-IP is supplied by Cloudflare; the fallback is for local development.
-  const ip = request.headers.get("CF-Connecting-IP") ?? "local";
-  const time = now();
-  const start = Math.floor(time / windowMs) * windowMs;
-  const bucket = `${scope}:${start}:${await hash(ip)}`;
-  const row = await env.DB.prepare(
-    `INSERT INTO request_limits(bucket,count,expires_at) VALUES(?,1,?)
-    ON CONFLICT(bucket) DO UPDATE SET count=count+1 RETURNING count`,
-  )
-    .bind(bucket, start + windowMs)
-    .first<{ count: number }>();
-  if (!row || row.count > max) throw new ApiError("rate_limited", 429);
-}
-async function device(env: Env, value: string) {
-  return env.DB.prepare(
-    "SELECT user_id,token_hash,revoked_at,purpose FROM devices WHERE token_hash=?",
-  )
-    .bind(await hash(value))
-    .first<Device>();
-}
-function assertActive(d: Device | null): asserts d is Device {
-  if (!d) throw new ApiError("unauthorized", 401);
-  if (d.revoked_at !== null) throw new ApiError("device_moved", 401);
-}
-async function authenticate(request: Request, env: Env) {
-  const authorization = request.headers.get("Authorization");
-  let token: string | undefined;
-  if (authorization !== null) {
-    if (!/^Bearer [a-f0-9]{64}$/.test(authorization))
-      throw new ApiError("unauthorized", 401);
-    token = authorization.slice(7);
-  } else {
-    token = request.headers
-      .get("Cookie")
-      ?.split(";")
-      .map((x) => x.trim())
-      .find((x) => x.startsWith(cookieName + "="))
-      ?.slice(cookieName.length + 1);
-    if (request.method !== "GET" && !request.headers.get("Origin"))
-      throw new ApiError("origin_required", 403);
-  }
-  if (!token || !/^[a-f0-9]{64}$/.test(token))
-    throw new ApiError("unauthorized", 401);
-  const d = await device(env, token);
-  assertActive(d);
-  return d;
-}
+import {
+  type Env,
+  type User,
+  ApiError,
+  json,
+  now,
+  hash,
+  randomCode,
+  secret,
+  recovery,
+  nickname,
+  language,
+  body,
+  limit,
+  device,
+  assertActive,
+  authenticate,
+  cookieName,
+} from "./shared";
+import { golfRoute } from "./golf";
+export type { Env } from "./shared";
 async function profile(env: Env, userId: string) {
   const p = await env.DB.prepare(
     "SELECT user_id,nickname,personal_code,language,created_at,updated_at FROM users WHERE user_id=?",
@@ -282,7 +144,7 @@ async function route(request: Request, env: Env) {
     await env.DB.prepare("SELECT 1 AS ok").first();
     return json({
       status: "ok",
-      version: "0.3.0",
+      version: "0.3.1",
       environment: env.ENVIRONMENT,
       server_time: now(),
     });
@@ -333,7 +195,7 @@ async function route(request: Request, env: Env) {
     );
     return response;
   }
-  throw new ApiError("not_found", 404);
+  return golfRoute(request, env);
 }
 export default {
   async fetch(request: Request, env: Env): Promise<Response> {
@@ -372,13 +234,13 @@ export default {
       );
       response.headers.set(
         "Access-Control-Allow-Methods",
-        "GET, POST, PATCH, OPTIONS",
+        "GET, POST, PATCH, DELETE, OPTIONS",
       );
     }
     return response;
   },
   async scheduled(_event: ScheduledController, env: Env) {
-    // Stage 1 only cleans rate-limit buckets. Six-hour round expiry is Stage 8.
+    // Only rate-limit cleanup is enabled so far. Six-hour round expiry is Stage 6.
     await env.DB.prepare("DELETE FROM request_limits WHERE expires_at < ?")
       .bind(now())
       .run();

@@ -15,6 +15,7 @@ import Svg, { Path, Rect } from "react-native-svg";
 import { create } from "qrcode/lib/core/qrcode";
 import { Button, Card, colors, Field, styles, Txt } from "./components";
 import { useErrorText, useSession } from "./session";
+import { HomeRounds } from "./rounds";
 import type { Language } from "../data/model";
 
 function PersonalQR({ value, label }: { value: string; label: string }) {
@@ -154,6 +155,7 @@ export function Home() {
       </Txt>
       <Txt>{t("ready")}</Txt>
       <BackupKey />
+      <HomeRounds />
       <Card>
         <Txt style={{ color: colors.muted }}>{t("code")}</Txt>
         <Txt
@@ -175,7 +177,6 @@ export function Home() {
           onPress={() => router.push("/profile")}
         />
       </Card>
-      <Txt style={{ color: colors.muted, fontSize: 14 }}>{t("coming")}</Txt>
     </>
   );
 }
@@ -422,7 +423,9 @@ export function Shell({ children }: { children: React.ReactNode }) {
                 key={route}
                 accessibilityRole="tab"
                 accessibilityState={{ selected: path === route }}
-                onPress={() => router.replace(route)}
+                onPress={() => {
+                  if (path !== route) router.dismissTo(route);
+                }}
                 style={{
                   flex: 1,
                   padding: 18,

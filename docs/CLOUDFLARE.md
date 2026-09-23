@@ -2,6 +2,8 @@
 
 이번 소스는 로컬 Worker와 D1에서 동작하도록 구성했습니다. 실제 계정/리소스 연결은 아직 수행하지 않았습니다. 개발 DB와 운영 DB는 분리합니다.
 
+v0.3.1에는 `0002_courses_rounds.sql`이 추가되었습니다. 기존 1단계 개발 DB에는 `npm run db:local`로 추가 마이그레이션을 적용합니다. 운영 광고가 아직 없으므로 현재 버전은 운영 출시 대상이 아닙니다.
+
 ## 개발 서버 만들기
 
 저장소 루트에서 `cd yamone-golf-cloudflare` 후:
@@ -30,7 +32,7 @@ npx wrangler d1 migrations apply DB --remote --env production
 npx wrangler deploy --env production
 ```
 
-현재 Cron은 요청 제한 버킷 정리만 수행합니다. 6시간 라운드 종료는 후속 마이그레이션과 스케줄러에서 구현합니다.
+현재 Cron은 요청 제한 버킷 정리만 수행합니다. 6시간 라운드 종료는 6단계에서 스케줄러와 함께 구현합니다.
 
 ## 앱/웹 인증
 
@@ -51,3 +53,5 @@ npx wrangler deploy --env production
 - [Expo SDK 57 Crypto](https://docs.expo.dev/versions/v57.0.0/sdk/crypto/)
 - [Expo SDK 57 Localization](https://docs.expo.dev/versions/v57.0.0/sdk/localization/)
 - [Expo SDK 57 Router](https://docs.expo.dev/versions/v57.0.0/sdk/router/)
+
+공용 골프장 순서와 개인 즐겨찾기는 분리되어 있습니다. 공용 courses에는 favorite 속성이 없고, user_courses의 관계와 sort_order만 바뀝니다. 라운드 골프장 데이터는 생성 준비 시 별도 복사본을 저장합니다.

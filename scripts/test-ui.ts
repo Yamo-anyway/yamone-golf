@@ -43,22 +43,20 @@ async function main() {
       await setTimeout(200);
     }
     if (!ready) throw new Error("Test server startup timed out");
-    const code = await new Promise<number | null>((resolve, reject) => {
-      const test = spawn(
-        process.execPath,
-        ["--import", "tsx", "tests/identity-ui.ts"],
-        {
+    for (const file of ["tests/identity-ui.ts", "tests/rounds-ui.ts"]) {
+      const code = await new Promise<number | null>((resolve, reject) => {
+        const test = spawn(process.execPath, ["--import", "tsx", file], {
           stdio: "inherit",
           env: {
             ...process.env,
             PREVIEW_URL: `http://localhost:${previewPort}`,
           },
-        },
-      );
-      test.on("error", reject);
-      test.on("exit", resolve);
-    });
-    if (code !== 0) throw new Error(`UI test exited ${code}`);
+        });
+        test.on("error", reject);
+        test.on("exit", resolve);
+      });
+      if (code !== 0) throw new Error(`UI test exited ${code}`);
+    }
   } finally {
     api.kill("SIGTERM");
     preview.kill("SIGTERM");

@@ -16,7 +16,7 @@ function baseURL() {
   if (Platform.OS === "web") return "";
   throw new ApiError("configuration");
 }
-async function request<T>(
+export async function request<T>(
   path: string,
   method = "GET",
   value?: unknown,
