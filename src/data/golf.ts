@@ -1,3 +1,4 @@
+import type { EndRequest, EndView } from "../../shared/round-ending";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { request } from "./api";
 export type Segment = { name: string; pars: number[] };
@@ -16,6 +17,7 @@ export type Round = {
   hole_count: 9 | 18;
   status: "active" | "ended";
   created_at: number;
+  ended_at: number | null;
 };
 export type Invitation = {
   invitation_id: string;
@@ -27,6 +29,7 @@ export type Invitation = {
 export type HomeData = {
   active_round: Round | null;
   invitations: Invitation[];
+  ended_rounds: Round[];
 };
 export type CourseList = { courses: Course[]; version: number };
 export type RoundDetail = {
@@ -77,6 +80,20 @@ export const pendingRound = {
   clear: (user: string) => AsyncStorage.removeItem(key(user)),
 };
 export const golf = {
+  ending: (id: string) => request<EndView>("/api/rounds/" + id + "/ending"),
+  end: (id: string, value: EndRequest) =>
+    request<EndView>("/api/rounds/" + id + "/ending", "POST", value),
+  endPermission: (
+    id: string,
+    value: {
+      user_id: string;
+      mutation_id: string;
+      permission_version: number;
+      participant_id: string;
+      can_end: boolean;
+    },
+  ) =>
+    request<EndView>("/api/rounds/" + id + "/end-permissions", "POST", value),
   home: () => request<HomeData>("/api/home"),
   courses: (q = "", offset = 0) =>
     request<{ courses: Course[]; next_offset: number | null }>(

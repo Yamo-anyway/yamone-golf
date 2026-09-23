@@ -116,6 +116,9 @@ after(async () => {
 beforeEach(async () => {
   await db.batch(
     [
+      "round_lifecycle_mutations",
+      "round_completions",
+      "round_endings",
       "receipts",
       "deliveries",
       "scores",

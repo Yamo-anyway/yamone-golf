@@ -9,6 +9,7 @@ import {
   type Round,
   type Check,
 } from "./round-store";
+import { lifecycleRoute } from "./round-lifecycle";
 import { scoresRoute } from "./scores";
 import { playersRoute } from "./players";
 import {
@@ -93,11 +94,14 @@ async function getCourse(env: Env, id: string) {
   return c;
 }
 async function activeRound(env: Env, user: string) {
-  return stmt(
+  const current = await stmt(
     env,
     "SELECT r.* FROM active_round_users a JOIN rounds r ON r.round_id=a.round_id WHERE a.user_id=? AND r.status='active'",
     user,
   ).first<Round>();
+  if (!current) return null;
+  const latest = await getRound(env, current.round_id);
+  return latest.status === "active" ? latest : null;
 }
 function roundView(r: Round) {
   const { course_snapshot, ...rest } = r;
@@ -236,7 +240,12 @@ async function execute(env: Env, d: Device, a: Action) {
         args: [p.invitation_id, d.user_id],
       });
     writes.push(
-      stmt(env, "UPDATE rounds SET updated_at=? WHERE round_id=?", time, id),
+      stmt(
+        env,
+        "UPDATE rounds SET updated_at=?,record_version=record_version+1 WHERE round_id=?",
+        time,
+        id,
+      ),
     );
   }
   writes.push(
@@ -301,6 +310,8 @@ export async function golfRoute(request: Request, env: Env): Promise<Response> {
   const d = await authenticate(request, env);
   if (method !== "GET")
     await limit(request, env, `golf:${d.user_id}`, 120, 60_000);
+  const lifecycle = await lifecycleRoute(request, env, d);
+  if (lifecycle) return lifecycle;
   if (path === "/api/courses" && method === "GET") {
     const q = (url.searchParams.get("q") ?? "").slice(0, 80),
       offset = Math.max(0, Number(url.searchParams.get("offset") ?? 0));
@@ -449,10 +460,16 @@ export async function golfRoute(request: Request, env: Env): Promise<Response> {
     const r = await activeRound(env, d.user_id);
     const invites = await stmt(
       env,
-      "SELECT i.invitation_id,i.round_id,u.nickname AS sender_name,r.course_snapshot,r.hole_count FROM round_invitations i JOIN rounds r ON r.round_id=i.round_id JOIN users u ON u.user_id=i.sender_id WHERE i.recipient_id=? AND i.status='pending' AND r.status='active' ORDER BY i.created_at DESC LIMIT 100",
+      "SELECT i.invitation_id,i.round_id,u.nickname AS sender_name,r.course_snapshot,r.hole_count FROM round_invitations i JOIN rounds r ON r.round_id=i.round_id JOIN users u ON u.user_id=i.sender_id WHERE i.recipient_id=? AND i.status='pending' AND r.status='active' AND r.updated_at>CAST(unixepoch('subsec')*1000 AS INTEGER)-21600000 ORDER BY i.created_at DESC LIMIT 100",
       d.user_id,
     ).all<{ course_snapshot: string }>();
+    const ended = await stmt(
+      env,
+      "SELECT r.* FROM rounds r JOIN round_participants p ON p.round_id=r.round_id WHERE p.user_id=? AND r.status='ended' ORDER BY r.ended_at DESC LIMIT 10",
+      d.user_id,
+    ).all<Round>();
     return json({
+      ended_rounds: ended.results.map(roundView),
       active_round: r ? roundView(r) : null,
       invitations: invites.results.map(({ course_snapshot, ...rest }) => ({
         ...rest,
@@ -473,6 +490,8 @@ export async function golfRoute(request: Request, env: Env): Promise<Response> {
       code,
     ).first<Round>();
     if (!r) throw new ApiError("round_not_found", 404);
+    if ((await getRound(env, r.round_id)).status !== "active")
+      throw new ApiError("round_ended", 409);
     // The join code is a bearer invitation. Do not expose players, user IDs or personal codes here.
     const creator = await stmt(
       env,

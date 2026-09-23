@@ -1,5 +1,5 @@
 // These are policy functions, not an ad SDK or a record that an ad was watched.
-// The round backend will persist the (user_id, round_id) settlement in a later stage.
+// The round backend persists the (user_id, round_id) settlement at create/join.
 export type BannerContext = {
   screen:
     | "home"

@@ -206,6 +206,11 @@ async function main() {
     );
     await a.page.getByTestId("save-hole").click();
     await a.page.getByTestId("reject-score-conflict").click();
+    // Conflict rejection updates durable storage before publishing the latest value.
+    await a.page
+      .getByTestId("score-value-" + self.slot_id)
+      .filter({ hasText: /^7$/ })
+      .waitFor();
     assert.equal(
       await a.page.getByTestId("score-value-" + self.slot_id).textContent(),
       "7",

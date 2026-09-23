@@ -116,6 +116,9 @@ after(async () => {
 beforeEach(async () => {
   await db.batch(
     [
+      "round_lifecycle_mutations",
+      "round_completions",
+      "round_endings",
       "receipts",
       "deliveries",
       "score_audit",
@@ -250,9 +253,10 @@ test("equal stale values are no-ops and do not extend round activity or add audi
   const f = await fixture(),
     s = await snapshot(f);
   const first = await save(f, write(s, [4, 4, 4]));
+  const oldActivity = Date.now() - 60_000;
   await db
-    .prepare("UPDATE rounds SET updated_at=123 WHERE round_id=?")
-    .bind(f.r.round_id)
+    .prepare("UPDATE rounds SET updated_at=? WHERE round_id=?")
+    .bind(oldActivity, f.r.round_id)
     .run();
   const same = await save(f, write(s, [4, 4, 4]), f.b);
   assert.equal(same.status, 200);
@@ -262,7 +266,7 @@ test("equal stale values are no-ops and do not extend round activity or add audi
       .prepare("SELECT updated_at FROM rounds WHERE round_id=?")
       .bind(f.r.round_id)
       .first<any>())!.updated_at,
-    123,
+    oldActivity,
   );
   assert.equal(
     (await db.prepare("SELECT count(*) n FROM score_audit").first<any>())!.n,

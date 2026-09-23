@@ -342,5 +342,48 @@ const en: Record<keyof typeof ko, string> = {
     "The current user differs from this saved request. Checking your user again.",
   reprepareDeleteHelp:
     "The deletion request is preserved. Review the new draft, then press Delete this hole to send it.",
+  endRound: "End round",
+  endNow: "End this round",
+  roundEndedTitle: "Ended round",
+  completionCheck: "Check each player’s scores",
+  autoEndReason: "Ended automatically after 6 hours without record changes.",
+  manualEndReason: "This round has ended.",
+  recordComplete: "Complete",
+  recordIncomplete: "Incomplete",
+  completionSeparate:
+    "Round ending and each player’s completion are separate. Nine-hole rounds are excluded from personal statistics.",
+  endConfirmHelp:
+    "End shared scoring for everyone. Check whether others still have unsent scores. Score entry here stops after the round ends.",
+  endLocalTitle: "Scores still on this device",
+  endLocalHelp:
+    "Review drafts and pending scores from every hole before ending. Resolve pending requests and conflicts first.",
+  saveAllBeforeEnd: "Save drafts · Retry sending",
+  discardAllDrafts: "Discard all unsent drafts",
+  discardAllDraftsHelp:
+    "Discard drafts for every hole on this device? Requests already sent or queued will be kept.",
+  endPermissions: "Delegate ending permission",
+  endPermissionsHelp:
+    "The creator can grant or revoke a participant’s permission to end the round.",
+  grantEnd: "Allow ending",
+  revokeEnd: "Revoke permission",
+  retryEnd: "Check ending · Retry",
+  end_pending:
+    "An ending request is awaiting confirmation. Check its result before entering more scores.",
+  end_local_pending:
+    "Drafts or pending scores remain. Review them all before ending.",
+  end_local_changed:
+    "Drafts changed on another screen. Review the latest drafts.",
+  end_changed:
+    "Round records changed during confirmation. Review the latest scores, then end again.",
+  end_forbidden:
+    "Only the creator or a participant with ending permission can end this round.",
+  permissions_changed:
+    "Ending permissions changed. Review the latest permissions.",
+  invalid_participant:
+    "Check the participant whose permission you want to change.",
+  recentEndedRounds: "Recently ended rounds",
+  endNoExtraAd: "No additional ad is required to end this round.",
+  roundActivityHelp:
+    "The server ends this round after 6 hours without record changes.",
 };
 export default en;

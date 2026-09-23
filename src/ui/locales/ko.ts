@@ -343,4 +343,45 @@ export default {
     "현재 사용자와 보관된 요청의 사용자가 다릅니다. 사용자를 다시 확인합니다.",
   reprepareDeleteHelp:
     "삭제 요청을 유지합니다. 새 초안을 검토한 뒤 ‘이 홀 삭제’를 눌러 전송하세요.",
+  endRound: "라운드 종료",
+  endNow: "라운드 종료하기",
+  roundEndedTitle: "종료된 라운드",
+  completionCheck: "플레이어별 입력 확인",
+  autoEndReason: "마지막 기록 변경 후 6시간이 지나 자동 종료되었습니다.",
+  manualEndReason: "라운드가 종료되었습니다.",
+  recordComplete: "입력 완료",
+  recordIncomplete: "미완료",
+  completionSeparate:
+    "라운드 종료와 플레이어별 기록 완료는 별개입니다. 9홀 기록은 개인 통계에 포함되지 않습니다.",
+  endConfirmHelp:
+    "모든 참여자의 공동 기록을 종료합니다. 다른 참여자가 작성 중인 점수도 확인해 주세요. 종료 후에는 이 화면에서 점수를 입력할 수 없습니다.",
+  endLocalTitle: "이 기기에 남아 있는 점수",
+  endLocalHelp:
+    "모든 홀의 초안·전송 대기를 확인해야 종료할 수 있습니다. 전송 중이거나 충돌한 점수는 처리 결과를 확인해 주세요.",
+  saveAllBeforeEnd: "초안 저장 · 전송 다시 시도",
+  discardAllDrafts: "미전송 초안 모두 버리기",
+  discardAllDraftsHelp:
+    "이 기기에만 저장된 모든 홀의 초안을 버릴까요? 서버에 보낸 전송 대기 점수는 보존됩니다.",
+  endPermissions: "종료 권한 위임",
+  endPermissionsHelp:
+    "생성자는 참여자에게 종료 권한을 주거나 회수할 수 있습니다.",
+  grantEnd: "종료 권한 주기",
+  revokeEnd: "종료 권한 회수",
+  retryEnd: "종료 처리 결과 확인 · 재시도",
+  end_pending:
+    "요청한 종료 결과를 확인 중입니다. 점수를 추가하기 전에 종료 처리 결과를 확인해 주세요.",
+  end_local_pending:
+    "초안 또는 전송 대기 점수가 남아 있습니다. 모두 확인한 뒤 종료해 주세요.",
+  end_local_changed:
+    "다른 화면에서 초안이 바뀌었습니다. 최신 초안을 확인해 주세요.",
+  end_changed:
+    "확인 중에 라운드 기록이 변경되었습니다. 최신 입력 상태를 확인한 뒤 다시 종료해 주세요.",
+  end_forbidden:
+    "라운드 생성자 또는 종료 권한을 받은 참여자만 종료할 수 있습니다.",
+  permissions_changed: "종료 권한이 변경되었습니다. 최신 권한을 확인해 주세요.",
+  invalid_participant: "권한을 변경할 참여자를 확인해 주세요.",
+  recentEndedRounds: "최근 종료한 라운드",
+  endNoExtraAd: "이 라운드의 광고 처리가 끝나 추가 광고 없이 종료됩니다.",
+  roundActivityHelp:
+    "마지막 기록 변경 후 6시간이 지나면 서버에서 자동 종료합니다.",
 };

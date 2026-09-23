@@ -171,6 +171,7 @@ export async function playersRoute(
     area = match[2],
     id = match[3] ? uid(match[3]) : null;
   await member(env, d, round);
+  await getRound(env, round);
   if (method === "GET") {
     if (area === "players" && !id) return json(await roster(env, round));
     if (area === "players" && id && match[4])
@@ -215,11 +216,13 @@ export async function playersRoute(
     return json(await result());
   const renameOnly =
     area === "players" && !!id && method === "PATCH" && b.action === "rename";
-  if (!renameOnly && (await getRound(env, round)).status !== "active")
+  const roundState = await getRound(env, round);
+  if (!renameOnly && roundState.status !== "active")
     throw new ApiError("round_ended", 409);
-  const checks = renameOnly
-      ? liveMember(round, d).slice(1)
-      : liveMember(round, d),
+  const checks =
+      renameOnly && roundState.status !== "active"
+        ? liveMember(round, d).slice(1)
+        : liveMember(round, d),
     writes: D1PreparedStatement[] = [];
   let failure = "player_changed";
   let old: Slot | null = null,
@@ -415,7 +418,7 @@ export async function playersRoute(
     writes.push(
       stmt(
         env,
-        "UPDATE rounds SET roster_version=roster_version+1,updated_at=? WHERE round_id=?",
+        "UPDATE rounds SET roster_version=roster_version+1,record_version=record_version+1,updated_at=CASE WHEN status='active' THEN ? ELSE updated_at END WHERE round_id=?",
         now(),
         round,
       ),

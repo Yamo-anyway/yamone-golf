@@ -224,7 +224,12 @@ export async function scoresRoute(
     }
     if (writes.length)
       writes.push(
-        stmt(env, "UPDATE rounds SET updated_at=? WHERE round_id=?", at, round),
+        stmt(
+          env,
+          "UPDATE rounds SET updated_at=?,record_version=record_version+1 WHERE round_id=?",
+          at,
+          round,
+        ),
       );
     writes.push(
       stmt(
@@ -242,6 +247,8 @@ export async function scoresRoute(
       return json({ sheet: await sheet(env, round, d), replayed: false });
     } catch (e) {
       if (!(e instanceof ApiError) || e.code !== "score_retry") throw e;
+      if ((await getRound(env, round)).status !== "active")
+        throw new ApiError("round_ended", 409);
     }
   }
   const old = await replay();

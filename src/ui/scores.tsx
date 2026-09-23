@@ -178,7 +178,7 @@ export function ScoresScreen() {
   const { sheet, rows } = draft,
     pars = sheet.course.segments.flatMap((s) => s.pars),
     half = hole > 9 ? 1 : 0;
-  const locked = !!pending;
+  const locked = !!pending || !!local?.endRequest;
   const existing = rows.some(
       (r) => scoreAt(sheet, r.slot_id, hole).strokes !== null,
     ),
@@ -271,7 +271,11 @@ export function ScoresScreen() {
               )}
               testID="save-hole"
               busy={task.busy}
-              disabled={!rows.length || (pending && pending.state !== "queued")}
+              disabled={
+                !!local?.endRequest ||
+                !rows.length ||
+                (pending && pending.state !== "queued")
+              }
               onPress={() => void save()}
             />
             <View style={{ flexDirection: "row", gap: 8 }}>
@@ -516,6 +520,22 @@ export function ScoresScreen() {
           />
         </Dialog>
       )}
+      <Button
+        label={t(
+          local?.endRequest
+            ? "retryEnd"
+            : ended
+              ? "roundEndedTitle"
+              : "endRound",
+        )}
+        secondary
+        testID="scores-end-round"
+        disabled={task.busy}
+        onPress={() =>
+          move(() => router.push({ pathname: "/round-ending", params: { id } }))
+        }
+      />
+      {local?.endRequest && <Txt>{t("end_pending")}</Txt>}
       <Button
         label={t("scorecard")}
         secondary

@@ -11,6 +11,7 @@ import {
   type JoinInput,
   type PendingRound,
 } from "../data/golf";
+import { EndedRoundSummary } from "./round-ending";
 import { useOfflineScores } from "./offline-scores";
 import { useSession } from "./session";
 import { Button, Card, colors, Field, styles, Txt } from "./components";
@@ -45,6 +46,7 @@ function OfflineRounds({ unavailable }: { unavailable: boolean }) {
     (r) =>
       offline ||
       unavailable ||
+      !!r.endRequest ||
       Object.keys(r.drafts).length ||
       Object.keys(r.queue).length,
   );
@@ -59,11 +61,11 @@ function OfflineRounds({ unavailable }: { unavailable: boolean }) {
             {t("pendingHoles")} {Object.keys(r.queue).length}
           </Txt>
           <Button
-            label={t("resumeLocalScores")}
+            label={t(r.endRequest ? "retryEnd" : "resumeLocalScores")}
             testID={"resume-local-" + r.sheet.round_id}
             onPress={() =>
               router.push({
-                pathname: "/scores",
+                pathname: r.endRequest ? "/round-ending" : "/scores",
                 params: { id: r.sheet.round_id },
               })
             }
@@ -173,6 +175,24 @@ export function HomeRounds() {
                     await task.reload();
                   });
               })
+            }
+          />
+        </Card>
+      ))}
+      {!!home?.ended_rounds?.length && (
+        <Txt style={{ fontWeight: "700" }}>{t("recentEndedRounds")}</Txt>
+      )}
+      {home?.ended_rounds?.map((r) => (
+        <Card key={r.round_id}>
+          <Txt>
+            {r.course.name} · {r.hole_count} {t("hole")}
+          </Txt>
+          <Button
+            label={t("roundEndedTitle")}
+            secondary
+            testID={"ended-round-" + r.round_id}
+            onPress={() =>
+              router.push({ pathname: "/round", params: { id: r.round_id } })
             }
           />
         </Card>
@@ -529,7 +549,11 @@ export function RoundScreen() {
   const detail = query.data;
   return (
     <>
-      <Heading title={t("currentRound")} />
+      <Heading
+        title={t(
+          detail?.round.status === "ended" ? "roundEndedTitle" : "currentRound",
+        )}
+      />
       <Problem text={task.errorText || query.errorText} />
       {detail && (
         <>
@@ -538,20 +562,24 @@ export function RoundScreen() {
               course={detail.round.course}
               holes={detail.round.hole_count}
             />
-            <Txt>{t("roundCode")}</Txt>
-            <Txt
-              selectable
-              testID="round-code"
-              style={{
-                fontSize: 25,
-                lineHeight: 33,
-                fontWeight: "800",
-                letterSpacing: 1,
-              }}
-            >
-              {detail.round.join_code}
-            </Txt>
-            <Txt>{t("selectHint")}</Txt>
+            {detail.round.status === "active" && (
+              <>
+                <Txt>{t("roundCode")}</Txt>
+                <Txt
+                  selectable
+                  testID="round-code"
+                  style={{
+                    fontSize: 25,
+                    lineHeight: 33,
+                    fontWeight: "800",
+                    letterSpacing: 1,
+                  }}
+                >
+                  {detail.round.join_code}
+                </Txt>
+                <Txt>{t("selectHint")}</Txt>
+              </>
+            )}
           </Card>
           <Card>
             <Txt style={{ fontWeight: "700" }}>
@@ -576,11 +604,16 @@ export function RoundScreen() {
               </Txt>
             ))}
           </Card>
-          <Button
-            label={t("scoreEntry")}
-            testID="enter-scores"
-            onPress={() => router.push({ pathname: "/scores", params: { id } })}
-          />
+          {detail.round.status === "ended" && <EndedRoundSummary id={id} />}
+          {detail.round.status === "active" && (
+            <Button
+              label={t("scoreEntry")}
+              testID="enter-scores"
+              onPress={() =>
+                router.push({ pathname: "/scores", params: { id } })
+              }
+            />
+          )}
           <Button
             label={t("scorecard")}
             testID="round-scorecard"
@@ -597,46 +630,60 @@ export function RoundScreen() {
               router.push({ pathname: "/players", params: { id } })
             }
           />
-          <Button
-            label={t("inputTargets")}
-            testID="input-targets"
-            secondary
-            onPress={() =>
-              router.push({ pathname: "/input-targets", params: { id } })
-            }
-          />
-          <Card>
-            <Txt style={{ fontWeight: "700" }}>{t("sendInvite")}</Txt>
-            <Txt>{t("inviteHelp")}</Txt>
-            <Field
-              label={t("inviteCode")}
-              testID="invite-code"
-              value={code}
-              maxLength={32}
-              autoCapitalize="characters"
-              autoCorrect={false}
-              editable={!task.busy}
-              onChangeText={(value) => {
-                setCode(value);
-                setSent(false);
-                setRequestId(Crypto.randomUUID());
-              }}
-            />
-            <Button
-              label={t("sendInvite")}
-              testID="send-invite"
-              busy={task.busy}
-              disabled={!code.trim() || sent}
-              onPress={() =>
-                void task.run(async () => {
-                  await golf.invite(id, requestId, code);
-                  setSent(true);
-                })
-              }
-            />
-            {sent && <Txt accessibilityRole="alert">{t("inviteSent")}</Txt>}
-          </Card>
-          <Txt style={{ color: colors.muted }}>{t("stage2RoundHelp")}</Txt>
+          {detail.round.status === "active" && (
+            <>
+              <Button
+                label={t("inputTargets")}
+                testID="input-targets"
+                secondary
+                onPress={() =>
+                  router.push({ pathname: "/input-targets", params: { id } })
+                }
+              />
+              <Card>
+                <Txt style={{ fontWeight: "700" }}>{t("sendInvite")}</Txt>
+                <Txt>{t("inviteHelp")}</Txt>
+                <Field
+                  label={t("inviteCode")}
+                  testID="invite-code"
+                  value={code}
+                  maxLength={32}
+                  autoCapitalize="characters"
+                  autoCorrect={false}
+                  editable={!task.busy}
+                  onChangeText={(value) => {
+                    setCode(value);
+                    setSent(false);
+                    setRequestId(Crypto.randomUUID());
+                  }}
+                />
+                <Button
+                  label={t("sendInvite")}
+                  testID="send-invite"
+                  busy={task.busy}
+                  disabled={!code.trim() || sent}
+                  onPress={() =>
+                    void task.run(async () => {
+                      await golf.invite(id, requestId, code);
+                      setSent(true);
+                    })
+                  }
+                />
+                {sent && <Txt accessibilityRole="alert">{t("inviteSent")}</Txt>}
+              </Card>
+              <Txt style={{ color: colors.muted }}>
+                {t("roundActivityHelp")}
+              </Txt>
+              <Button
+                label={t("endRound")}
+                testID="end-round"
+                secondary
+                onPress={() =>
+                  router.push({ pathname: "/round-ending", params: { id } })
+                }
+              />
+            </>
+          )}
         </>
       )}
       <Button

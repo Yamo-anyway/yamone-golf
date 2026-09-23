@@ -2,7 +2,7 @@
 
 이번 소스는 로컬 Worker와 D1에서 동작하도록 구성했습니다. 실제 계정/리소스 연결은 아직 수행하지 않았습니다. 개발 DB와 운영 DB는 분리합니다.
 
-v0.3.4는 4단계의 `0004_score_mutations.sql`까지 그대로 사용합니다. 새 D1 마이그레이션은 없습니다. 기존 1~3단계 개발 DB에는 `npm run db:local`로 추가 마이그레이션을 적용합니다. 운영 광고가 아직 없으므로 현재 버전은 운영 출시 대상이 아닙니다.
+v0.3.5는 `0005_round_ending.sql`을 추가합니다. 기존 1~5단계 개발 DB에는 `npm run db:local`로 추가 마이그레이션을 적용합니다. 운영 광고가 아직 없으므로 현재 버전은 운영 출시 대상이 아닙니다.
 
 ## 개발 서버 만들기
 
@@ -32,7 +32,7 @@ npx wrangler d1 migrations apply DB --remote --env production
 npx wrangler deploy --env production
 ```
 
-현재 Cron은 요청 제한 버킷 정리만 수행합니다. 6시간 라운드 종료는 6단계에서 스케줄러와 함께 구현합니다.
+Cron은 개발·운영 설정 모두 10분 간격으로 6시간 만료 라운드를 종료하고 요청 제한 버킷을 정리합니다. 종료 시각은 마지막 변경 +6시간으로 기록합니다. 실제 스케줄 실행은 배포 후에만 활성화되며, 로컬 검증에서는 scheduled 핸들러를 직접 호출했습니다. API도 만료를 검사하므로 Cron 실행 전후의 늦은 입력으로 만료 기한을 늘리지 못합니다.
 
 ## 앱/웹 인증
 
@@ -47,6 +47,7 @@ npx wrangler deploy --env production
 ## 참고한 공식 자료
 
 - [D1 batch와 트랜잭션](https://developers.cloudflare.com/d1/worker-api/d1-database/)
+- [Cloudflare Cron Triggers](https://developers.cloudflare.com/workers/configuration/cron-triggers/)
 - [D1 로컬 개발](https://developers.cloudflare.com/d1/best-practices/local-development/)
 - [D1 마이그레이션](https://developers.cloudflare.com/d1/reference/migrations/)
 - [Expo SDK 57 SecureStore](https://docs.expo.dev/versions/v57.0.0/sdk/securestore/)

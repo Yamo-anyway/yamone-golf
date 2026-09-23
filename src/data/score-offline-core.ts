@@ -1,3 +1,4 @@
+import type { EndRequest } from "../../shared/round-ending";
 import {
   initialHole,
   scoreAt,
@@ -37,6 +38,7 @@ export type LocalRound = {
   cachedAt: number;
   drafts: Record<string, Draft>;
   queue: Record<string, Queued>;
+  endRequest?: EndRequest;
 };
 export type OfflineData = {
   schema: 1;
@@ -134,6 +136,16 @@ function readData(raw: string, user: string): OfflineData {
         Object.entries(r.drafts).some(
           ([h, v]) => !validDraft(v) || Number(h) !== v.hole,
         )
+      )
+        throw Error();
+      if (
+        r.endRequest &&
+        (r.endRequest.user_id !== user ||
+          typeof r.endRequest.mutation_id !== "string" ||
+          !Number.isSafeInteger(r.endRequest.record_version) ||
+          r.endRequest.record_version < 0 ||
+          Object.keys(r.drafts).length ||
+          Object.keys(r.queue).length)
       )
         throw Error();
       if (
@@ -256,6 +268,9 @@ export class OfflineScores {
   }
   private putSheet(data: OfflineData, sheet: ScoreSheet) {
     const old = data.rounds[sheet.round_id];
+    // A delayed response from another tab must never reopen a confirmed ending.
+    if (old?.sheet.status === "ended" && sheet.status === "active")
+      sheet = { ...sheet, status: "ended" };
     data.rounds[sheet.round_id] = old
       ? { ...old, sheet, cachedAt: this.clock() }
       : {
@@ -291,6 +306,7 @@ export class OfflineScores {
   async change(round: string, hole: number, slot: string, delta: number) {
     await this.mutate((data) => {
       const r = this.require(data, round);
+      if (r.endRequest) throw { code: "end_pending" };
       if (r.queue[hole]) throw { code: "score_pending_locked" };
       if (r.sheet.status !== "active") throw { code: "round_ended" };
       const d = r.drafts[hole] ?? draftFor(r.sheet, hole),
@@ -312,6 +328,7 @@ export class OfflineScores {
   async enqueue(round: string, hole: number, remove = false) {
     await this.mutate((data) => {
       const r = this.require(data, round);
+      if (r.endRequest) throw { code: "end_pending" };
       if (r.queue[hole]) return;
       if (r.sheet.status !== "active") throw { code: "round_ended" };
       const draft = r.drafts[hole] ?? draftFor(r.sheet, hole);
@@ -330,6 +347,41 @@ export class OfflineScores {
       };
       r.queue[hole] = { write, draft, state: "queued" };
       delete r.drafts[hole];
+    });
+  }
+  async prepareEnd(round: string, recordVersion: number): Promise<EndRequest> {
+    let request!: EndRequest;
+    await this.mutate((data) => {
+      const r = this.require(data, round);
+      if (r.endRequest) {
+        request = r.endRequest;
+        return;
+      }
+      if (Object.keys(r.drafts).length || Object.keys(r.queue).length)
+        throw { code: "end_local_pending" };
+      request = {
+        user_id: this.user,
+        mutation_id: this.uuid(),
+        record_version: recordVersion,
+      };
+      r.endRequest = request;
+    });
+    return request;
+  }
+  async settleEnd(round: string, mutation: string, ended: boolean) {
+    await this.mutate((data) => {
+      const r = this.require(data, round);
+      if (r.endRequest?.mutation_id !== mutation) return;
+      if (ended) r.sheet.status = "ended";
+      delete r.endRequest;
+    });
+  }
+  async discardDrafts(round: string, expected: string) {
+    await this.mutate((data) => {
+      const r = this.require(data, round);
+      if (JSON.stringify(r.drafts) !== expected)
+        throw { code: "end_local_changed" };
+      r.drafts = {};
     });
   }
   pending() {

@@ -52,6 +52,7 @@ async function main() {
           "tests/players-ui.ts",
           "tests/scores-ui.ts",
           "tests/offline-ui.ts",
+          "tests/ending-ui.ts",
         ]) {
       const code = await new Promise<number | null>((resolve, reject) => {
         const test = spawn(process.execPath, ["--import", "tsx", file], {

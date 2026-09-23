@@ -17,6 +17,7 @@ import {
   authenticate,
   cookieName,
 } from "./shared";
+import { expireRounds } from "./round-store";
 import { golfRoute } from "./golf";
 export type { Env } from "./shared";
 async function profile(env: Env, userId: string) {
@@ -144,7 +145,7 @@ async function route(request: Request, env: Env) {
     await env.DB.prepare("SELECT 1 AS ok").first();
     return json({
       status: "ok",
-      version: "0.3.4",
+      version: "0.3.5",
       environment: env.ENVIRONMENT,
       server_time: now(),
     });
@@ -240,7 +241,7 @@ export default {
     return response;
   },
   async scheduled(_event: ScheduledController, env: Env) {
-    // Only rate-limit cleanup is enabled so far. Six-hour round expiry is Stage 6.
+    await expireRounds(env);
     await env.DB.prepare("DELETE FROM request_limits WHERE expires_at < ?")
       .bind(now())
       .run();

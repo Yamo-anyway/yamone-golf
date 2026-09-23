@@ -360,3 +360,143 @@ test("repreparing a blocked deletion retains deletion intent and does not upload
   await s.sync();
   assert.equal(scoreAt(f.server, "a", 1).strokes, null);
 });
+
+test("ending checks drafts and pending scores across every hole, including conflicts", async () => {
+  const f = fixture(),
+    s = f.make();
+  await s.refresh("r");
+  await s.change("r", 1, "a", 1);
+  await s.change("r", 18, "a", 1);
+  await assert.rejects(
+    s.prepareEnd("r", 2),
+    (e: any) => e.code === "end_local_pending",
+  );
+  await s.discard("r", 1);
+  await assert.rejects(
+    s.prepareEnd("r", 2),
+    (e: any) => e.code === "end_local_pending",
+  );
+  await s.enqueue("r", 18);
+  await assert.rejects(
+    s.prepareEnd("r", 2),
+    (e: any) => e.code === "end_local_pending",
+  );
+  f.server.scores.push({ slot_id: "a", hole: 18, strokes: 6, version: 1 });
+  await s.sync();
+  assert.equal(r(s).queue[18].state, "conflict");
+  await assert.rejects(
+    s.prepareEnd("r", 2),
+    (e: any) => e.code === "end_local_pending",
+  );
+  await s.confirm("r", 18);
+  await s.sync();
+  assert.equal((await s.prepareEnd("r", 2)).record_version, 2);
+});
+test("durable ending request survives response loss and restart, locks input and replays its original version", async () => {
+  const { sendEnd } = await import("../src/data/end-round");
+  const f = fixture(),
+    s = f.make();
+  await s.refresh("r");
+  let sent: any;
+  await assert.rejects(
+    sendEnd(s, "r", 7, async (b) => {
+      sent = b;
+      throw { code: "network" };
+    }),
+  );
+  assert.deepEqual(r(s).endRequest, sent);
+  const next = f.make();
+  await next.open();
+  await assert.rejects(
+    next.change("r", 1, "a", 1),
+    (e: any) => e.code === "end_pending",
+  );
+  await assert.rejects(
+    next.enqueue("r", 1),
+    (e: any) => e.code === "end_pending",
+  );
+  await sendEnd(next, "r", 99, async (b) => {
+    assert.deepEqual(b, sent);
+    return { status: "ended" } as any;
+  });
+  assert.equal(r(next).sheet.status, "ended");
+  assert.equal(r(next).endRequest, undefined);
+  await next.refresh("r"); // stale active response from an earlier read
+  assert.equal(r(next).sheet.status, "ended");
+});
+test("ending requires durable checkpoint; failed acknowledgement keeps request for safe retry", async () => {
+  const { sendEnd } = await import("../src/data/end-round");
+  const f = fixture(),
+    s = f.make();
+  await s.refresh("r");
+  f.failure = true;
+  let calls = 0;
+  await assert.rejects(
+    sendEnd(s, "r", 1, async () => {
+      calls++;
+      return {} as any;
+    }),
+  );
+  assert.equal(calls, 0);
+  f.failure = false;
+  await assert.rejects(
+    sendEnd(s, "r", 1, async () => {
+      f.failure = true;
+      return { status: "ended" } as any;
+    }),
+  );
+  const original = r(s).endRequest!;
+  assert.ok(original);
+  f.failure = false;
+  await sendEnd(s, "r", 2, async (b) => {
+    assert.deepEqual(b, original);
+    return { status: "ended" } as any;
+  });
+  assert.equal(r(s).endRequest, undefined);
+});
+test("known server changes require new confirmation and allow editing; ambiguous errors keep ending locked", async () => {
+  const { sendEnd } = await import("../src/data/end-round");
+  const f = fixture(),
+    s = f.make();
+  await s.refresh("r");
+  await assert.rejects(
+    sendEnd(s, "r", 1, async () => {
+      throw { code: "end_changed", status: 409 };
+    }),
+  );
+  assert.equal(r(s).endRequest, undefined);
+  await s.change("r", 1, "a", 1);
+  await s.discard("r", 1);
+  await assert.rejects(
+    sendEnd(s, "r", 2, async () => {
+      throw { code: "server_error", status: 500 };
+    }),
+  );
+  assert.ok(r(s).endRequest);
+});
+test("ending and draft discard re-read storage so a second editor cannot silently lose new drafts", async () => {
+  const f = fixture(),
+    a = f.make(),
+    b = f.make();
+  await a.refresh("r");
+  await b.open();
+  await a.change("r", 1, "a", 1);
+  const expected = JSON.stringify(r(a).drafts);
+  await b.change("r", 2, "b", 1);
+  await assert.rejects(
+    a.discardDrafts("r", expected),
+    (e: any) => e.code === "end_local_changed",
+  );
+  await assert.rejects(
+    a.prepareEnd("r", 1),
+    (e: any) => e.code === "end_local_pending",
+  );
+  await a.reloadLocal();
+  await a.discardDrafts("r", JSON.stringify(r(a).drafts));
+  const pending = await a.prepareEnd("r", 1);
+  await assert.rejects(
+    b.change("r", 3, "a", 1),
+    (e: any) => e.code === "end_pending",
+  );
+  assert.deepEqual(await b.prepareEnd("r", 5), pending);
+});

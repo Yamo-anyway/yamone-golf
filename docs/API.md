@@ -1,4 +1,4 @@
-# API — v0.3.4
+# API — v0.3.5
 
 모든 응답은 Cache-Control: no-store입니다. 오류는 `{ "error": "code" }` 형식이며 화면 문자열은 앱의 ko/en 리소스에서 정합니다. 각 성공 응답의 profile은 비밀값과 해시를 포함하지 않습니다.
 
@@ -130,4 +130,17 @@ PATCH action:
 
 `score_conflict`는 기기에 상세 내용을 보관하고 사용자 확인 뒤 새 mutation_id/확인한 버전으로 전송합니다. 확인하지 않은 초안, 종료/권한/목록 변경 보류 요청은 자동으로 승인하지 않습니다. `round_ended`는 자동 재시도 대상이 아니며 현재 기기에 요청을 유지합니다. 네트워크/5xx/429는 전면 실행 중 재시도 대상입니다.
 
-서버 D1 구조는 4단계의 0001~0004를 그대로 사용합니다. 서버가 이전 요청 성공을 기억하고 있는 한, 라운드 종료 이후의 동일 요청 재조회도 새 쓰기 없이 확인할 수 있습니다. 신규 요청은 종료 상태에서 거절합니다.
+5단계 점수 전송은 4단계의 0001~0004 점수 구조를 그대로 사용합니다. 서버가 이전 요청 성공을 기억하고 있는 한, 라운드 종료 이후의 동일 요청 재조회도 새 쓰기 없이 확인할 수 있습니다. 신규 요청은 종료 상태에서 거절합니다.
+
+## 6단계 종료 API
+
+모두 현재 활성 기기의 참여자 인증이 필요합니다.
+
+- `GET /api/rounds/:id/ending`: 서버 종료 여부/시각/사유, record_version, permission_version, 내 can_end/is_creator, 참가자별 종료 권한·개인 코드, 각 플레이어의 입력 홀 수/합계/완료 여부.
+- `POST /api/rounds/:id/ending`: `{user_id, mutation_id, record_version}`. 최신 버전과 권한을 검사하여 종료. 응답은 GET과 같은 종료 상태. 바뀐 기록은 `end_changed`(409), 위임 없는 사용자는 `end_forbidden`(403).
+- `POST /api/rounds/:id/end-permissions`: `{user_id,mutation_id,permission_version,participant_id,can_end:boolean}`. 생성자만 사용. 다른 버전은 `permissions_changed`(409). 비참여자/자기 자신 대상은 `invalid_participant`.
+- `GET /api/home`에 `ended_rounds`가 추가됩니다. 해당 사용자가 참여한 최근 종료 10개이며 개인 수신 기록이 아닙니다.
+
+새 요청의 user_id가 인증 사용자와 다르면 user_changed(409). 같은 요청 ID와 같은 내용은 재조회로 처리하고, 다른 내용은 request_reused(409). 이미 종료된 라운드의 종료 재요청은 현재 종료 상태를 반환하며 새 활동이나 광고 이력을 만들지 않습니다.
+
+마이그레이션 0005를 적용해야 합니다. 6시간 만료는 scheduled와 API 양쪽에서 처리하고 실제 쓰기 조건에도 기한을 검사합니다. 결과 미확정 오프라인 요청은 이전과 같이 같은 ID로 재시도할 수 있지만, 새로운 종료 후 점수 쓰기는 거절합니다.
