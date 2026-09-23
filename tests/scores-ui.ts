@@ -237,7 +237,7 @@ async function main() {
       ).strokes,
       8,
     );
-    // A lost successful save stays on the hole and retries without a second overwrite.
+    // A durable offline queue allows moving after local save; retry does not overwrite again.
     let lost = false;
     await a.page.route("**/api/rounds/*/scores", async (route) => {
       if (route.request().method() !== "PUT" || lost) {
@@ -252,15 +252,10 @@ async function main() {
     await a.page.getByTestId("hole-2").click();
     await a.page.getByTestId("save-and-move").click();
     await a.page
-      .getByText(
-        "서버에 연결하지 못했습니다. 입력한 내용은 그대로 두고 다시 시도하세요.",
-        { exact: true },
-      )
+      .getByTestId("current-hole")
+      .filter({ hasText: "홀 2" })
       .waitFor();
-    assert.equal(
-      await a.page.getByTestId("current-hole").textContent(),
-      "홀 1 · PAR 4",
-    );
+    await a.page.getByTestId("hole-1").click();
     await a.page.getByTestId("save-hole").click();
     await a.page
       .getByTestId("score-notice")

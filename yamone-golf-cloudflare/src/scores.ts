@@ -79,12 +79,17 @@ export async function scoresRoute(
   );
   if (!m) return null;
   const round = uid(m[1]);
+  const expectedUser = new URL(request.url).searchParams.get("user_id");
+  if (expectedUser && expectedUser !== d.user_id)
+    throw new ApiError("user_changed", 409);
   await getRound(env, round);
   await member(env, d, round);
   if (request.method === "GET") return json(await sheet(env, round, d));
   if (request.method !== "PUT") throw new ApiError("not_found", 404);
-  const b = await body(request),
-    id = uid(b.mutation_id),
+  const b = await body(request);
+  if (b.user_id !== undefined && b.user_id !== d.user_id)
+    throw new ApiError("user_changed", 409);
+  const id = uid(b.mutation_id),
     hole = Number(b.hole);
   if (
     !Number.isInteger(b.hole) ||

@@ -305,4 +305,42 @@ export default {
   invalid_score: "타수와 홀 정보를 확인해 주세요. 타수는 1~999의 정수입니다.",
   score_conflict: "최신 점수를 확인해 주세요.",
   total: "합계",
+  localDrafts: "초안",
+  pendingHoles: "전송 대기·보류",
+  syncingScores: "서버에 점수를 보내고 있습니다.",
+  offlineScoreHelp:
+    "변경은 기기에 먼저 보관됩니다. 저장을 누른 홀만 서버로 전송합니다.",
+  draftHoles: "초안 홀",
+  queuedHoles: "전송 대기·확인할 홀",
+  scoreQueued: "기기에 저장 · 전송 대기",
+  scoreHeld: "확인 필요 · 기기에 보관",
+  syncNow: "다시 동기화",
+  keepDraftAndMove: "초안 보관 후 이동",
+  reviewLater: "나중에 확인 · 다른 홀 입력",
+  reviewScoreConflict: "이 홀 충돌 확인",
+  endedOfflineHold:
+    "라운드가 종료되어 점수를 자동 반영하지 않았습니다. 입력값은 이 기기에 보관합니다. 종료 후 입력 처리 정책은 아직 확정되지 않았습니다.",
+  blockedOfflineHold:
+    "서버 상태나 권한이 바뀌어 전송을 보류했습니다. 입력값은 그대로 보관합니다.",
+  reprepareScores: "최신 입력 대상으로 다시 준비",
+  reprepareHelp:
+    "아래의 현재 입력 대상에 맞춰 초안을 다시 준비합니다. 제외된 플레이어의 값은 이번 초안에서 제거됩니다. 겹치는 플레이어의 점수 충돌은 저장 시 다시 확인합니다.",
+  excludedDraftPlayers: "이번 초안에서 제외",
+  cachedScorecardHelp:
+    "최근 확인한 서버 기록입니다. 기기 초안·전송 대기 점수는 순위에 포함되지 않습니다.",
+  offlineSession: "오프라인 · 기기에 보관한 기록",
+  localRound: "기기에 보관한 라운드",
+  resumeLocalScores: "보관한 점수 이어서 입력",
+  offline_storage:
+    "기기에 저장하지 못했습니다. 변경을 적용하지 않았거나 전송 확인이 남아 있습니다. 공간을 확인한 뒤 다시 시도하세요.",
+  offline_corrupt:
+    "기기 저장 데이터를 읽을 수 없습니다. 원본을 보존했으며 덮어쓰지 않습니다.",
+  offline_unavailable:
+    "이 기기에 보관된 라운드가 없습니다. 연결된 상태에서 라운드를 먼저 열어 주세요.",
+  score_pending_locked:
+    "이 홀의 전송 결과를 확인 중입니다. 다른 홀은 계속 입력할 수 있어요.",
+  user_changed:
+    "현재 사용자와 보관된 요청의 사용자가 다릅니다. 사용자를 다시 확인합니다.",
+  reprepareDeleteHelp:
+    "삭제 요청을 유지합니다. 새 초안을 검토한 뒤 ‘이 홀 삭제’를 눌러 전송하세요.",
 };

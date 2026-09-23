@@ -304,5 +304,43 @@ const en: Record<keyof typeof ko, string> = {
     "Check the hole and scores. Strokes must be whole numbers from 1 to 999.",
   score_conflict: "Review the latest scores.",
   total: "Total",
+  localDrafts: "Drafts",
+  pendingHoles: "Pending / held",
+  syncingScores: "Sending scores to the server.",
+  offlineScoreHelp:
+    "Changes are kept on this device first. Only holes you save are sent to the server.",
+  draftHoles: "Draft holes",
+  queuedHoles: "Pending / review holes",
+  scoreQueued: "Saved on device · Pending sync",
+  scoreHeld: "Needs review · Kept on device",
+  syncNow: "Sync again",
+  keepDraftAndMove: "Keep draft and continue",
+  reviewLater: "Review later · Enter other holes",
+  reviewScoreConflict: "Review this hole’s conflict",
+  endedOfflineHold:
+    "The round has ended. These scores were not applied and remain on this device. Handling late scores after a round ends is not yet decided.",
+  blockedOfflineHold:
+    "Sending is on hold because the server state or permission changed. Your values are preserved.",
+  reprepareScores: "Prepare with current players",
+  reprepareHelp:
+    "Prepare a draft for the current selection below. Excluded players will be removed from this draft. Score conflicts for remaining players are checked again when saving.",
+  excludedDraftPlayers: "Excluded from this draft",
+  cachedScorecardHelp:
+    "Last checked server records. Local drafts and pending scores are excluded from rankings.",
+  offlineSession: "Offline · Records kept on this device",
+  localRound: "Round saved on this device",
+  resumeLocalScores: "Continue saved scores",
+  offline_storage:
+    "Could not save on this device. The change was not applied, or a sent request still needs acknowledgement. Check storage space and retry.",
+  offline_corrupt:
+    "Could not read local data. The original has been preserved and will not be overwritten.",
+  offline_unavailable:
+    "No cached round on this device. Open the round while connected first.",
+  score_pending_locked:
+    "This hole is awaiting confirmation. You can keep entering other holes.",
+  user_changed:
+    "The current user differs from this saved request. Checking your user again.",
+  reprepareDeleteHelp:
+    "The deletion request is preserved. Review the new draft, then press Delete this hole to send it.",
 };
 export default en;

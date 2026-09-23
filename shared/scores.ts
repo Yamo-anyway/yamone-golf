@@ -22,6 +22,7 @@ export type ScoreChange = {
   version: number;
 };
 export type ScoreWrite = {
+  user_id?: string;
   mutation_id: string;
   hole: number;
   roster_version: number;

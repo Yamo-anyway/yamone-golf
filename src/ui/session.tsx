@@ -6,13 +6,16 @@ import React, {
   useRef,
   useState,
 } from "react";
-import { AppState } from "react-native";
+import { AppState, Platform } from "react-native";
 import { useLocales } from "expo-localization";
 import * as Crypto from "expo-crypto";
 import { api, ApiError } from "../data/api";
 import { durableSecret, readVault, writeVault } from "../data/vault";
 import { recoveryKeyFromBytes, submitIdentity } from "../data/identity";
 import type { Language, Profile, Vault } from "../data/model";
+import { offlineProfile } from "../data/offline-profile";
+import { offlineScores } from "../data/offline-scores";
+import { startScoreSync } from "./offline-scores";
 import ko from "./locales/ko";
 import en from "./locales/en";
 
@@ -21,6 +24,7 @@ type Phase =
 type Session = {
   phase: Phase;
   profile: Profile | null;
+  offline: boolean;
   vault: Vault;
   busy: boolean;
   error: string;
@@ -47,6 +51,7 @@ const randomKey = async () =>
   recoveryKeyFromBytes(await Crypto.getRandomBytesAsync(32));
 export function SessionProvider({ children }: { children: React.ReactNode }) {
   const [phase, setPhase] = useState<Phase>("loading");
+  const [offline, setOffline] = useState(false);
   const [profile, setProfile] = useState<Profile | null>(null);
   const [vault, setVault] = useState<Vault>({});
   const [error, setError] = useState("");
@@ -64,7 +69,9 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
   const report = useCallback((e: unknown) => {
     const code = e instanceof ApiError ? e.code : "storage";
     setError(code);
-    if (code === "device_moved") {
+    if (code === "device_moved" || code === "user_changed") {
+      void offlineProfile.clear().catch(() => {});
+      setOffline(false);
       setProfile(null);
       setPhase("moved");
     }
@@ -84,12 +91,26 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
       }
       try {
         const result = await api.me();
+        await offlineProfile.write(result.profile);
+        setOffline(false);
         setProfile(result.profile);
         setPhase("ready");
       } catch (e) {
         if (e instanceof ApiError && e.code === "unauthorized") {
+          await offlineProfile.clear();
+          setOffline(false);
           setProfile(null);
           setPhase(stored.secret ? "expired" : "welcome");
+        } else if (e instanceof ApiError && e.code === "network") {
+          const cached = await offlineProfile.read();
+          if (cached && (Platform.OS === "web" || stored.secret)) {
+            setProfile(cached);
+            setOffline(true);
+            setPhase("ready");
+          } else {
+            report(e);
+            setPhase("error");
+          }
         } else {
           const code = report(e);
           if (code !== "device_moved")
@@ -120,6 +141,17 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
     });
     return () => subscription.remove();
   }, [profile, refresh]);
+  const userId = phase === "ready" ? profile?.user_id : undefined;
+  useEffect(() => {
+    if (!userId) return;
+    return startScoreSync(offlineScores(userId), () => void refresh());
+  }, [userId, refresh]);
+  useEffect(() => {
+    if (Platform.OS !== "web") return;
+    const online = () => void refresh();
+    window.addEventListener("online", online);
+    return () => window.removeEventListener("online", online);
+  }, [refresh]);
   async function identity(kind: "register" | "recover", input: string) {
     if (running.current) return;
     running.current = true;
@@ -148,6 +180,8 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
         api.identity,
       );
       setVault(await readVault());
+      await offlineProfile.write(result.profile);
+      setOffline(false);
       setProfile(result.profile);
       setPhase("ready");
     } catch (e) {
@@ -182,7 +216,10 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
     setBusy(true);
     setError("");
     try {
-      setProfile((await api.update(value)).profile);
+      const profile = (await api.update(value)).profile;
+      await offlineProfile.write(profile);
+      setProfile(profile);
+      setOffline(false);
       return true;
     } catch (e) {
       report(e);
@@ -194,7 +231,9 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
   }
   async function fresh(restore = false) {
     try {
+      await offlineProfile.clear();
       await writeVault({});
+      setOffline(false);
       setVault({});
       setProfile(null);
       setError("");
@@ -219,6 +258,7 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
       value={{
         phase,
         profile,
+        offline,
         vault,
         busy,
         error,

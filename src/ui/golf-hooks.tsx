@@ -36,9 +36,19 @@ export function useTask() {
   const lock = useRef(false);
   const report = useCallback(
     (e: unknown) => {
-      const code = e instanceof ApiError ? e.code : "storage";
+      const code =
+        e instanceof ApiError
+          ? e.code
+          : typeof e === "object" && e !== null && "code" in e
+            ? String(e.code)
+            : "storage";
       setError(code);
-      if (code === "device_moved" || code === "unauthorized") void refresh();
+      if (
+        code === "device_moved" ||
+        code === "unauthorized" ||
+        code === "user_changed"
+      )
+        void refresh();
     },
     [refresh],
   );

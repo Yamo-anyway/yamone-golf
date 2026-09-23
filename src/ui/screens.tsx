@@ -407,6 +407,14 @@ export function Shell({ children }: { children: React.ReactNode }) {
               <Txt style={{ color: colors.error }}>{error}</Txt>
             </View>
           )}
+          {s.offline && (
+            <Txt
+              testID="offline-session"
+              style={{ fontSize: 13, color: colors.muted }}
+            >
+              {s.t("offlineSession")}
+            </Txt>
+          )}
           <Gate>{children}</Gate>
         </ScrollView>
         {s.phase === "ready" && (

@@ -11,6 +11,7 @@ import {
   type JoinInput,
   type PendingRound,
 } from "../data/golf";
+import { useOfflineScores } from "./offline-scores";
 import { useSession } from "./session";
 import { Button, Card, colors, Field, styles, Txt } from "./components";
 import { Heading, Problem } from "./courses";
@@ -37,6 +38,41 @@ async function begin(user: string, input: CreateInput | JoinInput) {
     await pendingRound.write(user, { action_id: Crypto.randomUUID(), input });
   router.push("/round-action");
 }
+function OfflineRounds({ unavailable }: { unavailable: boolean }) {
+  const { profile, t, offline } = useSession(),
+    state = useOfflineScores(profile!.user_id);
+  const rounds = Object.values(state.data.rounds).filter(
+    (r) =>
+      offline ||
+      unavailable ||
+      Object.keys(r.drafts).length ||
+      Object.keys(r.queue).length,
+  );
+  return (
+    <>
+      {rounds.map((r) => (
+        <Card key={r.sheet.round_id}>
+          <Txt style={{ fontWeight: "700" }}>{t("localRound")}</Txt>
+          <Txt>{r.sheet.course.name}</Txt>
+          <Txt>
+            {t("localDrafts")} {Object.keys(r.drafts).length} ·{" "}
+            {t("pendingHoles")} {Object.keys(r.queue).length}
+          </Txt>
+          <Button
+            label={t("resumeLocalScores")}
+            testID={"resume-local-" + r.sheet.round_id}
+            onPress={() =>
+              router.push({
+                pathname: "/scores",
+                params: { id: r.sheet.round_id },
+              })
+            }
+          />
+        </Card>
+      ))}
+    </>
+  );
+}
 export function HomeRounds() {
   const { profile, t } = useSession();
   const task = useLoad(async () => ({
@@ -46,6 +82,7 @@ export function HomeRounds() {
   const home = task.data?.home;
   return (
     <>
+      <OfflineRounds unavailable={!!task.error} />
       <Problem text={task.errorText} />
       {task.data?.pending && (
         <Card>

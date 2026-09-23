@@ -1,41 +1,15 @@
-import { useEffect, useRef, useState } from "react";
-import { Modal, Platform, Pressable, ScrollView, View } from "react-native";
-import { router, useLocalSearchParams } from "expo-router";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { Modal, Pressable, ScrollView, View } from "react-native";
+import { router, useLocalSearchParams, useFocusEffect } from "expo-router";
 import { useNavigation, usePreventRemove } from "expo-router/react-navigation";
-import AsyncStorage from "@react-native-async-storage/async-storage";
-import * as Crypto from "expo-crypto";
-import { scores } from "../data/scores";
-import { ApiError } from "../data/api";
-import {
-  scoreAt,
-  initialHole,
-  ranking,
-  symbolFor,
-  type ScoreSheet,
-  type ScoreConflict,
-  type ScoreWrite,
-} from "../../shared/scores";
+import { scoreAt, ranking, symbolFor } from "../../shared/scores";
 import { Button, Card, Txt, colors } from "./components";
 import { Heading, Problem } from "./courses";
-import { useLoad, useTask } from "./golf-hooks";
+import { useTask } from "./golf-hooks";
 import { useSession } from "./session";
-type Draft = {
-  sheet: ScoreSheet;
-  hole: number;
-  rows: { slot_id: string; strokes: number; edited: boolean }[];
-};
-function draftFor(sheet: ScoreSheet, hole: number): Draft {
-  const par = sheet.course.segments.flatMap((s) => s.pars)[hole - 1];
-  return {
-    sheet,
-    hole,
-    rows: sheet.slot_ids.map((slot_id) => ({
-      slot_id,
-      strokes: scoreAt(sheet, slot_id, hole).strokes ?? par,
-      edited: false,
-    })),
-  };
-}
+import { draftFor } from "../data/score-offline-core";
+import { useOfflineScores } from "./offline-scores";
+import ko from "./locales/ko";
 function Dialog({
   children,
   onClose,
@@ -73,164 +47,138 @@ export function ScoresScreen() {
   const { id } = useLocalSearchParams<{ id: string }>(),
     { t, profile, phase } = useSession(),
     navigation = useNavigation();
-  const key = "ymg:last-hole:" + profile!.user_id + ":" + id;
-  const query = useLoad(async () => {
-    const sheet = await scores.get(id);
-    const saved = await AsyncStorage.getItem(key);
-    return {
-      sheet,
-      resume: initialHole(sheet, saved === null ? null : Number(saved)),
-    };
-  });
+  const offline = useOfflineScores(profile!.user_id),
+    { store } = offline;
   const task = useTask(),
-    [draft, setDraft] = useState<Draft | null>(null),
-    [notice, setNotice] = useState("");
-  const [leave, setLeave] = useState<(() => void) | null>(null);
-  const proceed = useRef<(() => void) | null>(null);
-  const [seen, setSeen] = useState<typeof query.data>(null);
-  const [conflict, setConflict] = useState<{
-      conflicts: ScoreConflict[];
-      sheet: ScoreSheet;
-      write: ScoreWrite;
-    } | null>(null),
-    [deleting, setDeleting] = useState(false);
-  const continuation = useRef<(() => void) | null>(null),
-    retry = useRef<{ signature: string; id: string } | null>(null);
-  const dirty = !!draft?.rows.some((r) => r.edited);
-  // Adopt new server snapshots only when there is no local edit or pending confirmation.
-  if (query.data && query.data !== seen && !dirty && !task.busy && !conflict) {
-    setSeen(query.data);
-    setDraft(draftFor(query.data.sheet, draft?.hole ?? query.data.resume));
-  }
+    [notice, setNotice] = useState(""),
+    [leave, setLeave] = useState<(() => void) | null>(null),
+    [deleting, setDeleting] = useState(false),
+    [hiddenConflict, setHiddenConflict] = useState(""),
+    [reviewBlocked, setReviewBlocked] = useState(false);
+  const proceed = useRef<(() => void) | null>(null),
+    continuation = useRef<(() => void) | null>(null);
+  const local = offline.data.rounds[id],
+    hole = local?.lastHole ?? 1,
+    pending = local?.queue[hole];
+  const draft = local
+    ? (local.drafts[hole] ?? pending?.draft ?? draftFor(local.sheet, hole))
+    : null;
+  const dirty =
+    !!local?.drafts[hole] &&
+    (!!local.drafts[hole].deleting ||
+      local.drafts[hole].rows.some((r) => r.edited));
+  const conflict =
+    pending?.state === "conflict" &&
+    pending.write.mutation_id !== hiddenConflict
+      ? pending
+      : null;
+  const latest = local?.sheet;
+  const report = task.report;
+  const reload = useCallback(async () => {
+    try {
+      await store.refresh(id);
+    } catch (e) {
+      if (
+        !store.snapshot().data.rounds[id] ||
+        !["network"].includes((e as { code?: string }).code ?? "")
+      )
+        report(e);
+    }
+  }, [store, id, report]);
+  useFocusEffect(
+    useCallback(() => {
+      void reload();
+      return undefined;
+    }, [reload]),
+  );
   useEffect(() => {
-    if (proceed.current && !dirty && !task.busy) {
+    if (proceed.current && !task.busy) {
       const action = proceed.current;
       proceed.current = null;
       action();
     }
-  }, [draft, dirty, task.busy]);
+  }, [offline.data, task.busy]);
   usePreventRemove(phase === "ready" && (dirty || task.busy), ({ data }) =>
     setLeave(() => () => navigation.dispatch(data.action)),
   );
-  useEffect(() => {
-    if (Platform.OS !== "web" || (!dirty && !task.busy)) return;
-    const handler = (e: BeforeUnloadEvent) => {
-      e.preventDefault();
-      e.returnValue = "";
-    };
-    window.addEventListener("beforeunload", handler);
-    return () => window.removeEventListener("beforeunload", handler);
-  }, [dirty, task.busy]);
-  const latest = query.data?.sheet;
   const move = (action: () => void) => {
     if (task.busy) return;
     if (dirty) setLeave(() => action);
     else action();
   };
-  const visit = (hole: number) =>
+  const visit = (next: number) =>
     move(() => {
-      if (!latest) return;
-      setDraft(draftFor(latest, hole));
-      setNotice("");
-      void AsyncStorage.setItem(key, String(hole)).catch(task.report);
-      void query.reload();
+      void task.run(async () => {
+        await store.visit(id, next);
+        setNotice("");
+        void reload();
+      });
     });
-  async function save(explicit?: ScoreWrite, after?: () => void) {
-    if (!draft || task.busy) return;
+  async function completeSend(after?: () => void) {
+    await store.sync();
+    const q = store.snapshot().data.rounds[id]?.queue[hole];
+    if (q?.state === "conflict") {
+      setHiddenConflict("");
+      return;
+    }
+    if (q?.state === "blocked") return;
+    setNotice(t(q ? "scoreQueued" : "holeSaved"));
+    const action = after ?? continuation.current;
+    if (action) proceed.current = action;
+    continuation.current = null;
+  }
+  async function save(remove = false, after?: () => void) {
     continuation.current = after ?? continuation.current;
-    const payload = explicit ?? {
-      hole: draft.hole,
-      roster_version: draft.sheet.roster_version,
-      target_version: draft.sheet.target_version,
-      entries: draft.rows.map((r) => ({
-        slot_id: r.slot_id,
-        strokes: r.strokes,
-        version: scoreAt(draft.sheet, r.slot_id, draft.hole).version,
-      })),
-      mutation_id: "",
-    };
-    const signature = JSON.stringify({ ...payload, mutation_id: "" });
-    if (!retry.current || retry.current.signature !== signature)
-      retry.current = { signature, id: Crypto.randomUUID() };
-    const write = { ...payload, mutation_id: retry.current.id };
     await task.run(async () => {
-      try {
-        const result = await scores.save(id, write);
-        query.setData({ sheet: result.sheet, resume: draft.hole });
-        setDraft(draftFor(result.sheet, draft.hole));
-        setConflict(null);
-        setNotice(t("holeSaved"));
-        retry.current = null;
-        if (continuation.current) {
-          const next = continuation.current;
-          proceed.current = next;
-          continuation.current = null;
-        }
-      } catch (e) {
-        if (e instanceof ApiError && e.code === "score_conflict") {
-          const info = e.details as {
-            conflicts: ScoreConflict[];
-            sheet: ScoreSheet;
-          };
-          setConflict({ ...info, write });
-          query.setData({ sheet: info.sheet, resume: draft.hole });
-        } else {
-          continuation.current = null;
-          throw e;
-        }
-      }
+      await store.enqueue(id, hole, remove);
+      await completeSend(after);
     });
   }
   function discard(action?: () => void) {
-    if (latest && draft) setDraft(draftFor(latest, draft.hole));
-    setLeave(null);
-    setConflict(null);
-    setNotice("");
-    continuation.current = null;
-    if (action) proceed.current = action;
+    void task.run(async () => {
+      await store.discard(id, hole);
+      setLeave(null);
+      setNotice("");
+      continuation.current = null;
+      if (action) proceed.current = action;
+    });
+  }
+  function keepDraft(action: () => void) {
+    void task.run(async () => {
+      await store.visit(id, hole);
+      setLeave(null);
+      proceed.current = action;
+    });
   }
   function rejectConflict() {
-    if (!conflict || !draft) return;
-    // Only conflicting rows adopt the server value. Other unsaved rows remain intact.
-    const byId = new Map(conflict.conflicts.map((c) => [c.slot_id, c]));
-    const updated = {
-      ...draft.sheet,
-      scores: [
-        ...draft.sheet.scores.filter(
-          (s) => !(s.hole === draft.hole && byId.has(s.slot_id)),
-        ),
-        ...conflict.conflicts.map((c) => ({
-          slot_id: c.slot_id,
-          hole: draft.hole,
-          strokes: c.strokes,
-          version: c.version,
-        })),
-      ],
-    };
-    const par = updated.course.segments.flatMap((s) => s.pars)[draft.hole - 1];
-    setDraft({
-      ...draft,
-      sheet: updated,
-      rows: draft.rows.map((r) => {
-        const c = byId.get(r.slot_id);
-        return c ? { ...r, strokes: c.strokes ?? par, edited: false } : r;
-      }),
+    void task.run(async () => {
+      await store.reject(id, hole);
+      continuation.current = null;
+      setNotice(t("latestApplied"));
     });
-    setConflict(null);
-    continuation.current = null;
-    setNotice(t("latestApplied"));
   }
+  const storeError =
+    offline.error &&
+    offline.error !== "network" &&
+    offline.error !== "score_conflict"
+      ? t(
+          offline.error in ko
+            ? (offline.error as keyof typeof ko)
+            : "server_error",
+        )
+      : "";
   if (!draft)
     return (
       <>
         <Heading title={t("scoreEntry")} />
-        <Problem text={query.errorText} />
-        <Button label={t("retry")} onPress={() => void query.reload()} />
+        <Problem text={storeError} />
+        <Button label={t("retry")} onPress={() => void reload()} />
       </>
     );
-  const { hole, sheet, rows } = draft,
+  const { sheet, rows } = draft,
     pars = sheet.course.segments.flatMap((s) => s.pars),
     half = hole > 9 ? 1 : 0;
+  const locked = !!pending;
   const existing = rows.some(
       (r) => scoreAt(sheet, r.slot_id, hole).strokes !== null,
     ),
@@ -238,7 +186,25 @@ export function ScoresScreen() {
   return (
     <>
       <Heading title={t("scoreEntry")} />
-      <Problem text={task.errorText || query.errorText} />
+      <Problem text={task.errorText || storeError} />
+      <View
+        style={{
+          gap: 6,
+          padding: 12,
+          backgroundColor: colors.mint,
+          borderRadius: 12,
+        }}
+      >
+        <Txt testID="offline-score-summary" style={{ fontSize: 13 }}>
+          {t("localDrafts")} {Object.keys(local!.drafts).length} ·{" "}
+          {t("pendingHoles")} {Object.keys(local!.queue).length}
+        </Txt>
+        {offline.syncing && (
+          <Txt style={{ fontSize: 12, color: colors.muted }}>
+            {t("syncingScores")}
+          </Txt>
+        )}
+      </View>
       <View style={{ flexDirection: "row", gap: 8 }}>
         {sheet.course.segments.map((seg, i) => (
           <View key={i} style={{ flex: 1 }}>
@@ -272,7 +238,10 @@ export function ScoresScreen() {
               borderWidth: 1,
             }}
           >
-            <Txt style={{ color: h === hole ? "#fff" : colors.ink }}>{h}</Txt>
+            <Txt style={{ color: h === hole ? "#fff" : colors.ink }}>
+              {h}
+              {local!.queue[h] ? " ◦" : local!.drafts[h] ? " ·" : ""}
+            </Txt>
           </Pressable>
         ))}
       </View>
@@ -291,10 +260,18 @@ export function ScoresScreen() {
         ) : (
           <>
             <Button
-              label={t(existing ? "editHole" : "saveHole")}
+              label={t(
+                pending
+                  ? "syncNow"
+                  : draft.deleting
+                    ? "deleteHole"
+                    : existing
+                      ? "editHole"
+                      : "saveHole",
+              )}
               testID="save-hole"
               busy={task.busy}
-              disabled={!rows.length}
+              disabled={!rows.length || (pending && pending.state !== "queued")}
               onPress={() => void save()}
             />
             <View style={{ flexDirection: "row", gap: 8 }}>
@@ -302,7 +279,7 @@ export function ScoresScreen() {
                 <Button
                   label={t("cancel")}
                   secondary
-                  disabled={task.busy || !dirty}
+                  disabled={task.busy || !dirty || locked}
                   testID="cancel-hole"
                   onPress={() => setLeave(() => () => {})}
                 />
@@ -312,7 +289,7 @@ export function ScoresScreen() {
                   <Button
                     label={t("deleteHole")}
                     secondary
-                    disabled={task.busy}
+                    disabled={task.busy || locked}
                     testID="delete-hole"
                     onPress={() => setDeleting(true)}
                   />
@@ -334,20 +311,7 @@ export function ScoresScreen() {
               base = scoreAt(sheet, r.slot_id, hole);
             const change = (delta: number) => {
               setNotice("");
-              setDraft({
-                ...draft,
-                rows: rows.map((x) =>
-                  x.slot_id === r.slot_id
-                    ? {
-                        ...x,
-                        strokes: Math.max(1, Math.min(999, x.strokes + delta)),
-                        edited:
-                          base.strokes === null ||
-                          x.strokes + delta !== base.strokes,
-                      }
-                    : x,
-                ),
-              });
+              void store.change(id, hole, r.slot_id, delta).catch(task.report);
             };
             return (
               <View
@@ -375,11 +339,15 @@ export function ScoresScreen() {
                     }}
                   >
                     {t(
-                      r.edited
-                        ? "scoreUnsaved"
-                        : base.strokes === null
-                          ? "scoreDefault"
-                          : "scoreSaved",
+                      pending
+                        ? pending.state === "queued"
+                          ? "scoreQueued"
+                          : "scoreHeld"
+                        : r.edited
+                          ? "scoreUnsaved"
+                          : base.strokes === null
+                            ? "scoreDefault"
+                            : "scoreSaved",
                     )}
                   </Txt>
                 </View>
@@ -402,7 +370,7 @@ export function ScoresScreen() {
                           textAlign: "center",
                         }}
                       >
-                        {r.strokes}
+                        {draft.deleting ? "—" : r.strokes}
                       </Txt>
                     )}
                     <Pressable
@@ -415,6 +383,8 @@ export function ScoresScreen() {
                       testID={(delta < 0 ? "minus-" : "plus-") + r.slot_id}
                       disabled={
                         task.busy ||
+                        locked ||
+                        draft.deleting ||
                         ended ||
                         r.strokes === (delta < 0 ? 1 : 999)
                       }
@@ -459,6 +429,93 @@ export function ScoresScreen() {
           />
         </View>
       </View>
+      {pending?.state === "conflict" && (
+        <Button
+          label={t("reviewScoreConflict")}
+          testID="review-score-conflict"
+          onPress={() => setHiddenConflict("")}
+        />
+      )}
+      {pending?.state === "blocked" && (
+        <Card>
+          <Txt style={{ fontWeight: "700" }}>{t("scoreHeld")}</Txt>
+          <Txt>
+            {t(
+              pending.error === "round_ended"
+                ? "endedOfflineHold"
+                : "blockedOfflineHold",
+            )}
+          </Txt>
+          <Problem
+            text={t(
+              pending.error && pending.error in ko
+                ? (pending.error as keyof typeof ko)
+                : "state_changed",
+            )}
+          />
+          {pending.write.entries.map((e) => (
+            <Txt selectable key={e.slot_id}>
+              {
+                pending.draft.sheet.players.find((p) => p.slot_id === e.slot_id)
+                  ?.name
+              }
+              : {e.strokes ?? t("notEntered")}
+            </Txt>
+          ))}
+          {["targets_changed", "state_changed"].includes(
+            pending.error ?? "",
+          ) && (
+            <Button
+              label={t("reprepareScores")}
+              onPress={() => {
+                void task.run(async () => {
+                  await store.refresh(id);
+                  setReviewBlocked(true);
+                });
+              }}
+            />
+          )}
+        </Card>
+      )}
+      {reviewBlocked && pending && (
+        <Dialog onClose={() => setReviewBlocked(false)}>
+          <Txt>{t("reprepareHelp")}</Txt>
+          {pending.write.entries.every((e) => e.strokes === null) && (
+            <Txt>{t("reprepareDeleteHelp")}</Txt>
+          )}
+          <Txt>
+            {latest?.slot_ids
+              .map((id) => latest.players.find((p) => p.slot_id === id)?.name)
+              .join(", ")}
+          </Txt>
+          <Txt>
+            {t("excludedDraftPlayers")}:{" "}
+            {pending.draft.rows
+              .filter((r) => !latest?.slot_ids.includes(r.slot_id))
+              .map(
+                (r) =>
+                  pending.draft.sheet.players.find(
+                    (p) => p.slot_id === r.slot_id,
+                  )?.name,
+              )
+              .join(", ") || "—"}
+          </Txt>
+          <Button
+            label={t("reprepareScores")}
+            onPress={() =>
+              void task.run(async () => {
+                await store.reprepare(id, hole);
+                setReviewBlocked(false);
+              })
+            }
+          />
+          <Button
+            label={t("cancel")}
+            secondary
+            onPress={() => setReviewBlocked(false)}
+          />
+        </Dialog>
+      )}
       <Button
         label={t("scorecard")}
         secondary
@@ -483,8 +540,23 @@ export function ScoresScreen() {
         secondary
         testID="refresh-scores"
         disabled={task.busy}
-        onPress={() => void query.reload()}
+        onPress={() => void reload()}
       />
+      <Card>
+        <Txt style={{ fontSize: 12, color: colors.muted }}>
+          {t(offline.syncing ? "syncingScores" : "offlineScoreHelp")}
+        </Txt>
+        {Object.keys(local!.drafts).length > 0 && (
+          <Txt testID="draft-holes" style={{ fontSize: 12 }}>
+            {t("draftHoles")}: {Object.keys(local!.drafts).join(", ")}
+          </Txt>
+        )}
+        {Object.keys(local!.queue).length > 0 && (
+          <Txt testID="queued-holes" style={{ fontSize: 12 }}>
+            {t("queuedHoles")}: {Object.keys(local!.queue).join(", ")}
+          </Txt>
+        )}
+      </Card>
       <Txt style={{ fontSize: 13, color: colors.muted }}>
         {t("scoreRefreshHelp")}
       </Txt>
@@ -499,8 +571,15 @@ export function ScoresScreen() {
             onPress={() => {
               const action = leave;
               setLeave(null);
-              void save(undefined, action);
+              void save(false, action);
             }}
+          />
+          <Button
+            label={t("keepDraftAndMove")}
+            testID="keep-draft-and-move"
+            secondary
+            disabled={task.busy}
+            onPress={() => keepDraft(leave)}
           />
           <Button
             label={t("discardAndMove")}
@@ -532,17 +611,7 @@ export function ScoresScreen() {
             testID="confirm-delete-hole"
             onPress={() => {
               setDeleting(false);
-              void save({
-                mutation_id: "",
-                hole,
-                roster_version: sheet.roster_version,
-                target_version: sheet.target_version,
-                entries: rows.map((r) => ({
-                  slot_id: r.slot_id,
-                  strokes: null,
-                  version: scoreAt(sheet, r.slot_id, hole).version,
-                })),
-              });
+              void save(true);
             }}
           />
           <Button
@@ -555,12 +624,12 @@ export function ScoresScreen() {
       {conflict && (
         <Dialog
           onClose={() => {
-            if (!task.busy) rejectConflict();
+            if (!task.busy) setHiddenConflict(conflict!.write.mutation_id);
           }}
         >
           <Txt style={{ fontWeight: "800" }}>{t("scoreConflictTitle")}</Txt>
           <Txt>{t("scoreConflictHelp")}</Txt>
-          {conflict.conflicts.map((c) => (
+          {conflict.conflicts!.map((c) => (
             <Txt key={c.slot_id}>
               {sheet.players.find((p) => p.slot_id === c.slot_id)?.name}:{" "}
               {c.strokes ?? t("notEntered")} → {c.proposed ?? t("notEntered")}
@@ -572,16 +641,20 @@ export function ScoresScreen() {
             testID="confirm-score-conflict"
             busy={task.busy}
             onPress={() => {
-              const versions = new Map(
-                conflict.conflicts.map((c) => [c.slot_id, c.version]),
-              );
-              void save({
-                ...conflict.write,
-                entries: conflict.write.entries.map((e) => ({
-                  ...e,
-                  version: versions.get(e.slot_id) ?? e.version,
-                })),
+              void task.run(async () => {
+                await store.confirm(id, hole);
+                await completeSend();
               });
+            }}
+          />
+          <Button
+            label={t("reviewLater")}
+            testID="defer-score-conflict"
+            secondary
+            disabled={task.busy}
+            onPress={() => {
+              continuation.current = null;
+              setHiddenConflict(conflict.write.mutation_id);
             }}
           />
           <Button
@@ -641,17 +714,41 @@ function ScoreMark({ strokes, par }: { strokes: number | null; par: number }) {
 }
 export function ScorecardScreen() {
   const { id } = useLocalSearchParams<{ id: string }>(),
-    { t } = useSession(),
-    query = useLoad(() => scores.get(id)),
-    sheet = query.data;
+    { t, profile } = useSession(),
+    offline = useOfflineScores(profile!.user_id),
+    { store } = offline;
+  const sheet = offline.data.rounds[id]?.sheet;
+  const storeError =
+    offline.error && offline.error !== "network"
+      ? t(
+          offline.error in ko
+            ? (offline.error as keyof typeof ko)
+            : "server_error",
+        )
+      : "";
+  const reload = useCallback(async () => {
+    try {
+      await store.refresh(id);
+    } catch {
+      /* Cached server records remain available. */
+    }
+  }, [store, id]);
+  useFocusEffect(
+    useCallback(() => {
+      void reload();
+    }, [reload]),
+  );
   const [hole, setHole] = useState<number | null>(null);
   return (
     <>
       <Heading title={t("scorecard")} />
-      <Problem text={query.errorText} />
+      <Problem text={storeError} />
       {sheet && (
         <>
           <Txt>{sheet.course.name}</Txt>
+          <Txt style={{ fontSize: 12, color: colors.muted }}>
+            {t("cachedScorecardHelp")}
+          </Txt>
           {sheet.course.segments.map((segment, half) => (
             <View
               key={half}
@@ -730,7 +827,7 @@ export function ScorecardScreen() {
                 );
               })}
             </View>
-          ))}{" "}
+          ))}
           <Txt style={{ color: colors.muted, fontSize: 13 }}>
             {t("scoreLegend")}
           </Txt>
@@ -789,7 +886,7 @@ export function ScorecardScreen() {
         label={t("refresh")}
         testID="refresh-scorecard"
         secondary
-        onPress={() => void query.reload()}
+        onPress={() => void reload()}
       />
     </>
   );

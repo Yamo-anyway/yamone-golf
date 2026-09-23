@@ -435,3 +435,16 @@ test("trusted web origins can preflight PUT score saves", async () => {
     r.headers.get("Access-Control-Allow-Methods")?.split(", ").includes("PUT"),
   );
 });
+test("offline score requests are bound to their original user, even when another participant has authenticated", async () => {
+  const f = await fixture(),
+    s = await snapshot(f),
+    b = { ...write(s, [4, 4, 4]), user_id: f.a.user_id };
+  assert.equal((await save(f, b, f.b)).data.error, "user_changed");
+  assert.deepEqual((await snapshot(f)).scores, []);
+  assert.equal(
+    (await req(f.path + "/scores?user_id=" + f.a.user_id, f.b.token)).data
+      .error,
+    "user_changed",
+  );
+  assert.equal((await save(f, b)).status, 200);
+});

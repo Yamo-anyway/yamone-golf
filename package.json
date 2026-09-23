@@ -1,6 +1,6 @@
 {
   "name": "yamone-golf",
-  "version": "0.3.3",
+  "version": "0.3.4",
   "main": "expo-router/entry",
   "dependencies": {
     "@expo/metro-runtime": "~57.0.16",
@@ -12,6 +12,7 @@
     "expo-dev-client": "~57.0.19",
     "expo-linking": "~57.0.10",
     "expo-localization": "~57.0.2",
+    "expo-network": "~57.0.2",
     "expo-router": "~57.0.22",
     "expo-secure-store": "~57.0.4",
     "expo-status-bar": "~57.0.1",
