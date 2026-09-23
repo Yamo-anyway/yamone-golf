@@ -116,6 +116,7 @@ after(async () => {
 beforeEach(async () => {
   await db.batch(
     [
+      "peoria_runs",
       "round_lifecycle_mutations",
       "round_completions",
       "round_endings",
@@ -786,4 +787,211 @@ test("stage 6 upgrade preserves existing round ads and data while adding receive
     db = previousDB;
     await legacy.dispose();
   }
+});
+
+// History fixtures are deliberately inserted into test D1; no production calculation exists yet.
+async function peoriaFixture() {
+  const f = await fixture(2);
+  for (let h = 1; h <= 18; h++) {
+    const saved = await save(
+      f,
+      write(await snapshot(f), [4, h === 1 ? 7 : null], h),
+    );
+    assert.equal(saved.status, 200);
+  }
+  await end(f);
+  const own = await link(f, 0, f.a),
+    visitor = await link(f, 1, f.c);
+  return { ...f, own, visitor };
+}
+async function seedPeoria(f: any, ordinal = 1, mutate?: (v: any) => void) {
+  const v = {
+    run_id: randomUUID(),
+    round_id: f.r.round_id,
+    ordinal,
+    calculated_at: Date.now(),
+    actor_id: f.a.user_id,
+    actor_name: "계산 당시 이름",
+    source_record_version: (await ending(f)).record_version,
+    algorithm_version: "test-fixture-only",
+    snapshot: {
+      course_name: "계산 당시 골프장",
+      pars: Array(18).fill(4),
+      players: [
+        {
+          slot_id: f.own.slot_id,
+          user_id: f.a.user_id,
+          name: "선수 A",
+          scores: Array(18).fill(4),
+        },
+        {
+          slot_id: f.visitor.slot_id,
+          user_id: f.c.user_id,
+          name: "선수 B",
+          scores: [7, ...Array(17).fill(null)],
+        },
+      ],
+    },
+    target_slot_ids: [f.own.slot_id],
+    excluded_slot_ids: [f.visitor.slot_id],
+    results: [
+      { slot_id: f.own.slot_id, gross: 72, handicap: 0, net: 72, rank: 1 },
+    ],
+  };
+  mutate?.(v);
+  await db
+    .prepare(
+      `INSERT INTO peoria_runs(run_id,round_id,ordinal,calculated_at,actor_id,actor_name,
+    source_record_version,algorithm_version,snapshot_json,target_slots_json,excluded_slots_json,results_json,
+    hidden_holes_json,request_id,request_hash) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+    )
+    .bind(
+      v.run_id,
+      v.round_id,
+      v.ordinal,
+      v.calculated_at,
+      v.actor_id,
+      v.actor_name,
+      v.source_record_version,
+      v.algorithm_version,
+      JSON.stringify(v.snapshot),
+      JSON.stringify(v.target_slot_ids),
+      JSON.stringify(v.excluded_slot_ids),
+      JSON.stringify(v.results),
+      JSON.stringify([1, 2, 3, 4, 5, 6, 10, 11, 12, 13, 14, 15]),
+      randomUUID(),
+      "PRIVATE-REQUEST-HASH",
+    )
+    .run();
+  return v;
+}
+test("Peoria history requires an ended round and membership or a current receipt; calculation stays unavailable", async () => {
+  const f = await fixture(2);
+  assert.equal(
+    (await req(f.path + "/peoria", f.a.token)).data.error,
+    "round_not_ended",
+  );
+  await end(f);
+  const history = await req(f.path + "/peoria", f.b.token);
+  assert.equal(history.status, 200);
+  assert.deepEqual(history.data.runs, []);
+  assert.equal(history.data.latest_run_id, null);
+  assert.deepEqual(history.data.calculation, {
+    available: false,
+    reason: "policy_pending",
+  });
+  assert.equal((await req(f.path + "/peoria", f.c.token)).status, 403);
+  assert.equal((await req(f.path + "/peoria", f.a.token, {})).status, 404);
+});
+test("Peoria has at most three integer ordinals and returns latest first without overwriting old runs", async () => {
+  const f = await peoriaFixture();
+  const first = await seedPeoria(f, 1);
+  const second = await seedPeoria(f, 2);
+  const third = await seedPeoria(f, 3);
+  await assert.rejects(seedPeoria(f, 4), /CHECK/);
+  await assert.rejects(seedPeoria(f, 1.5), /CHECK/);
+  await assert.rejects(seedPeoria(f, 1), /UNIQUE/);
+  const h = (await req(f.path + "/peoria", f.a.token)).data;
+  assert.deepEqual(h.runs, [third, second, first]);
+  assert.equal(h.latest_run_id, third.run_id);
+});
+test("Peoria excludes private SQL columns and unknown nested JSON fields from both public read paths", async () => {
+  const f = await peoriaFixture();
+  const seeded = await seedPeoria(f, 1, (v) => {
+    v.snapshot.hidden_holes = "PRIVATE-NESTED";
+    v.snapshot.players[0].draw_seed = "PRIVATE-NESTED";
+    v.results[0].hidden_sum = "PRIVATE-NESTED";
+  });
+  const receivedRecord = await received(f, f.visitor, f.c);
+  for (const path of [
+    f.path + "/peoria",
+    "/api/records/" + receivedRecord.receipt.receipt_id,
+  ]) {
+    const r = await req(path, f.c.token);
+    assert.equal(r.status, 200);
+    const runs = r.data.runs ?? r.data.peoria_runs;
+    assert.equal(runs[0].run_id, seeded.run_id);
+    assert.equal(runs[0].snapshot.players[1].scores[1], null);
+    const encoded = JSON.stringify(r.data);
+    assert.doesNotMatch(
+      encoded,
+      /hidden_holes|draw_seed|hidden_sum|request_hash|request_id|PRIVATE/,
+    );
+  }
+});
+test("deleting a nonparticipant receipt removes Peoria access while preserving shared history", async () => {
+  const f = await peoriaFixture();
+  const run = await seedPeoria(f);
+  assert.equal((await req(f.path + "/peoria", f.c.token)).status, 403);
+  const result = await received(f, f.visitor, f.c);
+  assert.equal((await req(f.path + "/peoria", f.c.token)).status, 200);
+  assert.equal(
+    (await req("/api/records/" + result.receipt.receipt_id, f.a.token)).status,
+    404,
+  );
+  await deleteRecord(result.receipt, f.c);
+  assert.equal((await req(f.path + "/peoria", f.c.token)).status, 403);
+  assert.deepEqual(
+    (await req("/api/records/" + result.receipt.receipt_id, f.c.token)).data
+      .peoria_runs,
+    [],
+  );
+  assert.equal(
+    (await req(f.path + "/peoria", f.b.token)).data.runs[0].run_id,
+    run.run_id,
+  );
+  await db
+    .prepare("UPDATE devices SET revoked_at=? WHERE user_id=?")
+    .bind(Date.now(), f.b.user_id)
+    .run();
+  assert.equal((await req(f.path + "/peoria", f.b.token)).status, 401);
+});
+test("own score correction and renamed users leave stored Peoria snapshots and results unchanged", async () => {
+  const f = await peoriaFixture();
+  const first = await seedPeoria(f);
+  const result = await received(f, f.own, f.a);
+  const path = "/api/records/" + result.receipt.receipt_id + "/scores";
+  const view = (await req(path, f.a.token)).data;
+  const changed = await req(
+    path,
+    f.a.token,
+    {
+      user_id: f.a.user_id,
+      mutation_id: randomUUID(),
+      player_slot_id: f.own.slot_id,
+      slot_version: view.slot_version,
+      hole: 1,
+      strokes: 5,
+      version: 1,
+    },
+    "PUT",
+  );
+  assert.equal(changed.status, 200, JSON.stringify(changed));
+  await db
+    .prepare("UPDATE users SET nickname=? WHERE user_id=?")
+    .bind("새 닉네임", f.a.user_id)
+    .run();
+  const history = (await req(f.path + "/peoria", f.a.token)).data;
+  assert.ok(history.record_version > first.source_record_version);
+  assert.deepEqual(history.runs, [first]);
+  const detail = (
+    await req("/api/records/" + result.receipt.receipt_id, f.a.token)
+  ).data;
+  assert.deepEqual(detail.peoria_runs, [first]);
+  assert.equal(
+    detail.sheet.scores.find(
+      (s: any) => s.slot_id === f.own.slot_id && s.hole === 1,
+    ).strokes,
+    5,
+  );
+});
+test("malformed history is rejected without echoing private stored data", async () => {
+  const f = await peoriaFixture();
+  await seedPeoria(f, 1, (v) => {
+    v.snapshot.players[0].scores[0] = { hidden_holes: "PRIVATE-NESTED" };
+  });
+  const r = await req(f.path + "/peoria", f.a.token);
+  assert.equal(r.status, 500);
+  assert.equal(r.data.error, "peoria_history_invalid");
+  assert.doesNotMatch(JSON.stringify(r.data), /PRIVATE|hidden_holes/);
 });

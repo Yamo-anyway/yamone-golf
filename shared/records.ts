@@ -1,5 +1,6 @@
 import type { ScoreSheet } from "./scores";
 import type { EditAccess } from "./personal-records";
+import type { PeoriaRun } from "./peoria";
 export type Delivery = {
   delivery_id: string;
   round_id: string;
@@ -53,6 +54,5 @@ export type RecordDetail = {
   current_player: boolean;
   slot_version: number;
   edit: EditAccess;
-  // Populated by the Peoria stage; a receipt grants access to the whole round.
-  peoria_runs: unknown[];
+  peoria_runs: PeoriaRun[];
 };

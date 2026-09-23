@@ -173,7 +173,7 @@ PATCH action:
 
 개인 삭제는 공동 라운드/점수/다른 사람의 기록과 과거 received 전송을 변경하지 않습니다. 삭제한 RECEIPT의 재조회·수신 재시도는 deleted 상태를 반환하고 sheet는 null입니다. 새로운 명시적 전송만 새 수신 항목이 됩니다. 예전 삭제 요청은 나중에 받은 새 RECEIPT를 삭제하지 않습니다.
 
-sheet는 전체 플레이어·홀별 점수·코스/PAR을 포함하는 읽기 전용 원본 조회입니다. 비참여 수신자에게 공동 입력 권한을 부여하지 않습니다. current_player는 현재 슬롯의 연결 사용자 일치 여부이고 can_manage는 기존 참여자인지 나타냅니다. peoria_runs는 9단계 전까지 빈 배열입니다.
+sheet는 전체 플레이어·홀별 점수·코스/PAR을 포함하는 읽기 전용 원본 조회입니다. 비참여 수신자에게 공동 입력 권한을 부여하지 않습니다. current_player는 현재 슬롯의 연결 사용자 일치 여부이고 can_manage는 기존 참여자인지 나타냅니다. peoria_runs는 9단계 준비부터 저장된 공개 신페리오 이력을 최신 순으로 반환합니다. 계산 쓰기는 미연결이며 이력이 없으면 빈 배열입니다.
 
 추가 오류: record_not_found/delivery_not_found(404), delivery_unavailable/already_received/player_link_changed/request_reused/user_changed/ad_required(409), forbidden(403), ads_not_configured(503). 서버 성공 전에는 앱에서 수신 완료로 표시하지 않습니다.
 
@@ -208,3 +208,15 @@ sheet는 전체 플레이어·홀별 점수·코스/PAR을 포함하는 읽기 �
 24시간 기한은 SQL 실행 시 서버 시각으로 재검사합니다. 이미 성공한 요청은 기한/연결/수신 상태가 나중에 달라져도 재확인할 수 있으나 다른 본문은 request_reused입니다. 진행 중 공동 입력 API는 종료 후 계속 거절하며 이 API만 본인 수정 권한을 갖습니다. 원본 SCORE와 감사 이력/record_version은 함께 저장합니다. ended_at/updated_at/round_completions/광고 이력은 변경하지 않습니다.
 
 오류: record_edit_forbidden(403), record_deleted/record_unlinked/record_locked/player_link_changed/score_conflict/user_changed/request_reused/state_changed(409), invalid_score(400). 비소유 RECEIPT는 record_not_found(404)이며 폐기 기기는 401입니다. 상태 경쟁 시 재검사하거나 전체 트랜잭션을 롤백합니다.
+
+## 신페리오 이력 — 9단계 준비
+
+`GET /api/rounds/:round_id/peoria`
+
+- 활성 기기 인증 필요. 해당 라운드의 기존 참여자 또는 현재 received 개인 기록 수신자만 조회합니다.
+- 진행 중 라운드는 `409 round_not_ended`. 무권한 사용자는 `403 forbidden`입니다.
+- 응답: `round_id`, 현재 `record_version`, `latest_run_id`(없으면 null), `runs`(최신 순), `calculation: {available:false, reason:"policy_pending"}`.
+- 각 이력: 식별자/순번/계산 시각/계산자 당시 이름/원본 버전/알고리즘 버전/코스명·PAR·전체 선수 점수 Snapshot/대상·제외 슬롯 ID/총타수·핸디캡·네트 점수·순위.
+- 숨김 홀과 내부 요청 ID/해시를 반환하지 않습니다. 상세 타입은 shared/peoria.ts입니다.
+- 동일 공개 이력은 `GET /api/records/:receipt_id`의 `peoria_runs`에도 포함합니다. 삭제된 RECEIPT에는 빈 배열, 다른 사용자 RECEIPT는 404입니다.
+- 아직 POST/PUT/PATCH/DELETE 또는 계산 엔진은 제공하지 않습니다. 정책 제안과 후속 구현은 PEORIA.md 참조.

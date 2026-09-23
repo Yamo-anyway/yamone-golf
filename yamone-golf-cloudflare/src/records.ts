@@ -23,6 +23,7 @@ import type {
   RecordDetail,
 } from "../../shared/records";
 import { editAccess } from "../../shared/personal-records";
+import { peoriaPublicColumns, publicPeoriaRun } from "./peoria-history";
 const deliverySQL = `SELECT d.*,su.nickname sender_name,ru.nickname recipient_name,
  COALESCE(pu.nickname,p.name) player_name,json_extract(r.course_snapshot,'$.name') course_name,
  r.hole_count,r.ended_at,r.creator_id,p.user_id linked_user_id,p.deleted_at slot_deleted,r.status round_status
@@ -308,6 +309,13 @@ export async function recordDetail(
       id,
       d.user_id,
     ),
+    stmt(
+      env,
+      `SELECT ${peoriaPublicColumns} FROM peoria_runs p WHERE p.round_id=(SELECT round_id FROM receipts WHERE receipt_id=?) AND ${access} ORDER BY p.ordinal DESC`,
+      id,
+      id,
+      d.user_id,
+    ),
   ]);
   const row = result[0].results[0];
   if (!row) throw new ApiError("record_not_found", 404);
@@ -333,7 +341,7 @@ export async function recordDetail(
       !!current_player,
       now(),
     ),
-    peoria_runs: [],
+    peoria_runs: result[3].results.map(publicPeoriaRun),
     sheet:
       r.status === "received"
         ? {
