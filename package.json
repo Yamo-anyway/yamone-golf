@@ -1,0 +1,57 @@
+{
+  "name": "yamone-golf",
+  "version": "0.3.0",
+  "main": "expo-router/entry",
+  "dependencies": {
+    "@expo/metro-runtime": "~57.0.16",
+    "@react-native-async-storage/async-storage": "2.2.0",
+    "expo": "~57.0.24",
+    "expo-constants": "~57.0.19",
+    "expo-crypto": "~57.0.3",
+    "expo-dev-client": "~57.0.19",
+    "expo-linking": "~57.0.10",
+    "expo-localization": "~57.0.2",
+    "expo-router": "~57.0.22",
+    "expo-secure-store": "~57.0.4",
+    "expo-status-bar": "~57.0.1",
+    "qrcode": "^1.5.4",
+    "react": "19.2.3",
+    "react-dom": "19.2.3",
+    "react-native": "0.86.3",
+    "react-native-safe-area-context": "~5.7.0",
+    "react-native-screens": "~4.26.0",
+    "react-native-svg": "15.15.4",
+    "react-native-web": "~0.21.0"
+  },
+  "devDependencies": {
+    "@types/node": "^26.6.2",
+    "@types/qrcode": "^1.5.6",
+    "@types/react": "~19.2.2",
+    "eslint": "^9.39.5",
+    "eslint-config-expo": "~57.0.2",
+    "playwright": "^1.63.0",
+    "prettier": "^3.9.8",
+    "tsx": "^4.23.15",
+    "typescript": "~6.0.3"
+  },
+  "scripts": {
+    "start": "expo start",
+    "web": "expo start --web",
+    "android": "expo start --android",
+    "ios": "expo start --ios",
+    "lint": "expo lint",
+    "typecheck": "tsc --noEmit && npm run typecheck --workspace yamone-golf-cloudflare",
+    "test": "npm run test --workspace yamone-golf-cloudflare && node --import tsx --test tests/*.test.ts",
+    "test:ui": "node --import tsx scripts/test-ui.ts",
+    "export:web": "expo export --platform web",
+    "export:android": "expo export --platform android --output-dir dist-android",
+    "server": "npm run dev --workspace yamone-golf-cloudflare",
+    "db:local": "npm run db:local --workspace yamone-golf-cloudflare",
+    "preview": "node --import tsx scripts/preview.ts",
+    "format": "prettier --write src tests scripts docs yamone-golf-cloudflare/src yamone-golf-cloudflare/tests"
+  },
+  "private": true,
+  "workspaces": [
+    "yamone-golf-cloudflare"
+  ]
+}

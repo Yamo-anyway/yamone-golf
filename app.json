@@ -1,0 +1,36 @@
+{
+  "expo": {
+    "name": "Yamone Golf Dev",
+    "slug": "yamone-golf-cloudflare-dev",
+    "version": "0.3.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "light",
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.yamone.golf.dev",
+      "buildNumber": "3"
+    },
+    "android": {
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/android-icon-foreground.png",
+        "backgroundColor": "#173F34"
+      },
+      "predictiveBackGestureEnabled": false,
+      "package": "com.yamone.golf.dev",
+      "versionCode": 3
+    },
+    "web": {
+      "favicon": "./assets/favicon.png",
+      "name": "Yamone Golf",
+      "bundler": "metro",
+      "output": "single"
+    },
+    "plugins": [
+      "expo-localization",
+      "expo-secure-store",
+      "expo-router"
+    ],
+    "scheme": "yamone-golf-dev"
+  }
+}

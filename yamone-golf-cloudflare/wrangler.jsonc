@@ -1,0 +1,30 @@
+{
+  "$schema": "../node_modules/wrangler/config-schema.json",
+  "name": "yamone-golf-api-dev",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-09-23",
+  "workers_dev": true,
+  "vars": {
+    "ENVIRONMENT": "development",
+    "ALLOWED_ORIGINS": "http://localhost:8081,http://127.0.0.1:8081,http://localhost:4173,http://127.0.0.1:4173"
+  },
+  "d1_databases": [{
+    "binding": "DB",
+    "database_name": "yamone-golf-dev",
+    "database_id": "00000000-0000-0000-0000-000000000000",
+    "migrations_dir": "migrations"
+  }],
+  "triggers": { "crons": ["*/10 * * * *"] },
+  "env": {
+    "production": {
+      "name": "yamone-golf-api",
+      "vars": { "ENVIRONMENT": "production", "ALLOWED_ORIGINS": "" },
+      "d1_databases": [{
+        "binding": "DB", "database_name": "yamone-golf",
+        "database_id": "00000000-0000-0000-0000-000000000000",
+        "migrations_dir": "migrations"
+      }],
+      "triggers": { "crons": ["*/10 * * * *"] }
+    }
+  }
+}
