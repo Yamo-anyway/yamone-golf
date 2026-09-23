@@ -137,7 +137,7 @@ export default {
   inviteSent: "초대를 보냈습니다.",
   inviteHelp: "초대받은 사람의 홈에 카드가 표시됩니다.",
   stage2RoundHelp:
-    "플레이어와 내 입력 대상을 관리할 수 있어요. 점수 입력과 종료는 다음 단계에서 연결합니다.",
+    "플레이어·입력 대상을 관리하고 홀별 점수를 기록할 수 있어요. 라운드 종료는 다음 단계에서 연결합니다.",
   pendingRound: "진행하던 라운드 작업",
   resumeRound: "이어서 처리",
   roundReview: "라운드 최종 확인",
@@ -265,4 +265,44 @@ export default {
   delete_changed:
     "삭제 확인 이후 상태가 바뀌었습니다. 영향을 다시 확인해 주세요.",
   last_player: "마지막 플레이어는 삭제할 수 없습니다.",
+  scoreEntry: "스코어 입력",
+  scorecard: "스코어카드 · 순위",
+  holeScope: "이 홀의 내 입력 대상 전체",
+  saveHole: "이 홀 저장",
+  editHole: "이 홀 수정",
+  deleteHole: "이 홀 삭제",
+  holeSaved: "서버에 저장했습니다.",
+  noScoreTargets: "입력 대상을 선택하면 점수를 기록할 수 있어요.",
+  scoreDefault: "미입력 · PAR 기본값",
+  scoreUnsaved: "저장 전",
+  scoreSaved: "저장됨",
+  decreaseScore: "타수 줄이기",
+  increaseScore: "타수 늘리기",
+  previousHole: "이전 홀",
+  nextHole: "다음 홀",
+  scoreRefreshHelp:
+    "화면 진입·홀 이동·새로고침 시 최신 점수를 조회합니다. 작성 중인 점수는 유지됩니다.",
+  scoreLeaveTitle: "저장하지 않은 점수가 있어요",
+  scoreLeaveHelp:
+    "이 홀의 변경 내용을 어떻게 할까요? 저장에 실패하면 이동하지 않습니다.",
+  saveAndMove: "저장 후 이동",
+  discardAndMove: "저장하지 않고 이동",
+  deleteHoleHelp:
+    "선택된 플레이어의 이 홀 점수를 미입력으로 바꿉니다. 다른 플레이어와 다른 홀의 기록은 유지됩니다.",
+  scoreConflictTitle: "다른 기록자가 점수를 변경했어요",
+  scoreConflictHelp:
+    "아직 저장되지 않았습니다. 최신 점수 → 내 입력값으로 변경할까요?",
+  overwriteScores: "확인한 점수로 변경",
+  useLatestScores: "아니오 · 최신 점수 적용",
+  latestApplied:
+    "충돌한 점수에 최신 값을 적용했습니다. 다른 작성 내용은 유지됩니다.",
+  notEntered: "미입력",
+  cumulativeRank: "현재 누적 순위",
+  holeRank: "홀별 순위",
+  rankHelp: "낮은 타수부터 · 동점은 공동 순위 · 입력 홀 수를 함께 확인하세요.",
+  scoreLegend:
+    "파: 숫자 · 버디 이하: 원 · 보기: 박스 · 더블보기 이상: 박스 2개",
+  invalid_score: "타수와 홀 정보를 확인해 주세요. 타수는 1~999의 정수입니다.",
+  score_conflict: "최신 점수를 확인해 주세요.",
+  total: "합계",
 };

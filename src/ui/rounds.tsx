@@ -540,6 +540,19 @@ export function RoundScreen() {
             ))}
           </Card>
           <Button
+            label={t("scoreEntry")}
+            testID="enter-scores"
+            onPress={() => router.push({ pathname: "/scores", params: { id } })}
+          />
+          <Button
+            label={t("scorecard")}
+            testID="round-scorecard"
+            secondary
+            onPress={() =>
+              router.push({ pathname: "/scorecard", params: { id } })
+            }
+          />
+          <Button
             label={t("playerManagement")}
             testID="manage-players"
             secondary

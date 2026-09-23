@@ -6,6 +6,7 @@ export class ApiError extends Error {
   constructor(
     public code: string,
     public status = 0,
+    public details?: unknown,
   ) {
     super(code);
   }
@@ -39,7 +40,7 @@ export async function request<T>(
     });
     const data = await response.json();
     if (!response.ok)
-      throw new ApiError(data.error ?? "server_error", response.status);
+      throw new ApiError(data.error ?? "server_error", response.status, data);
     return data as T;
   } catch (error) {
     if (error instanceof ApiError) throw error;

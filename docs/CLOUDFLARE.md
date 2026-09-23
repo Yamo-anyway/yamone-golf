@@ -2,7 +2,7 @@
 
 이번 소스는 로컬 Worker와 D1에서 동작하도록 구성했습니다. 실제 계정/리소스 연결은 아직 수행하지 않았습니다. 개발 DB와 운영 DB는 분리합니다.
 
-v0.3.2에는 `0003_players_targets.sql`이 추가되었습니다. 기존 1·2단계 개발 DB에는 `npm run db:local`로 추가 마이그레이션을 적용합니다. 운영 광고가 아직 없으므로 현재 버전은 운영 출시 대상이 아닙니다.
+v0.3.3에는 `0004_score_mutations.sql`이 추가되었습니다. 기존 1~3단계 개발 DB에는 `npm run db:local`로 추가 마이그레이션을 적용합니다. 운영 광고가 아직 없으므로 현재 버전은 운영 출시 대상이 아닙니다.
 
 ## 개발 서버 만들기
 
@@ -57,3 +57,5 @@ npx wrangler deploy --env production
 공용 골프장 순서와 개인 즐겨찾기는 분리되어 있습니다. 공용 courses에는 favorite 속성이 없고, user_courses의 관계와 sort_order만 바뀝니다. 라운드 골프장 데이터는 생성 준비 시 별도 복사본을 저장합니다.
 
 3단계는 player_slots의 버전/삭제 표시, round의 roster_version, input_target_lists/input_targets, player_mutations/player_audit를 추가합니다. 기존 슬롯은 version=1, 삭제되지 않은 상태로 유지됩니다. 개인 목록의 초기 기본값은 전체 플레이어이며 명시적 선택을 저장한 뒤에는 저장한 선택을 사용합니다.
+
+4단계는 `score_mutations`(요청 중복 실행 방지), `score_audit`(점수 변경 이력), scores의 라운드/홀 인덱스를 추가합니다. 0003의 scores 구조를 그대로 사용하며 기존 점수는 변경하지 않습니다. 점수 삭제 후 null 행을 보존하여 이전 점수 버전이 다시 사용되지 않게 합니다. 신뢰한 웹 Origin에는 PUT 사전 요청도 허용합니다.

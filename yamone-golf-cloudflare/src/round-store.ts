@@ -25,7 +25,7 @@ export const uid = (v: unknown) => {
   return v;
 };
 export function revision(v: unknown) {
-  if (!Number.isInteger(v) || Number(v) < 0)
+  if (!Number.isSafeInteger(v) || Number(v) < 0)
     throw new ApiError("invalid_request");
   return Number(v);
 }

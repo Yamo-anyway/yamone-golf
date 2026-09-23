@@ -9,6 +9,7 @@ import {
   type Round,
   type Check,
 } from "./round-store";
+import { scoresRoute } from "./scores";
 import { playersRoute } from "./players";
 import {
   ApiError,
@@ -755,5 +756,5 @@ export async function golfRoute(request: Request, env: Env): Promise<Response> {
     );
     return json({ ok: true });
   }
-  return playersRoute(request, env, d);
+  return (await scoresRoute(request, env, d)) ?? playersRoute(request, env, d);
 }

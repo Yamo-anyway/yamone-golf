@@ -1,4 +1,4 @@
-# API — v0.3.2
+# API — v0.3.3
 
 모든 응답은 Cache-Control: no-store입니다. 오류는 `{ "error": "code" }` 형식이며 화면 문자열은 앱의 ko/en 리소스에서 정합니다. 각 성공 응답의 profile은 비밀값과 해시를 포함하지 않습니다.
 
@@ -91,6 +91,33 @@ PATCH action:
 
 ## 후속 점수·기록 API 통합 시 제약
 
-0003 마이그레이션의 scores/deliveries/receipts는 삭제 안전성 검사를 위한 참조 구조입니다. 3단계에는 이 테이블을 쓰는 일반 사용자 API가 없습니다. API 테스트만 기록을 넣어 삭제 보호를 확인합니다.
+0003 마이그레이션의 scores는 아래 4단계 API가 사용합니다. deliveries/receipts는 삭제 보호용 참조 구조만 있으며 보내기/받기 API는 7단계에서 연결합니다.
 
 4단계의 점수 저장은 동일 트랜잭션에서 deleted_at IS NULL, 활성 기기, 참여/입력 권한, 라운드 상태와 홀 범위를 확인해야 합니다. 삭제된 슬롯에 뒤늦게 도착한 입력을 복원해서는 안 됩니다. 점수 없음은 strokes=NULL 또는 행 부재이며 0은 저장할 수 없습니다. 7단계의 전송·수신도 수신 사용자·라운드·슬롯 관계를 함께 검증해야 합니다.
+
+## 4단계 스코어 API
+
+`GET /api/rounds/:round_id/scores`: 참여자에게 라운드 상태, 9/18홀, 코스/PAR 복사본, 플레이어, 내 입력 대상 순서/버전, `scores[{slot_id,hole,strokes,version}]`을 같은 D1 batch의 일관된 상태로 반환합니다. 행이 없으면 `strokes=null,version=0`으로 해석합니다. 삭제한 점수는 null 행과 증가한 버전을 유지합니다.
+
+`PUT /api/rounds/:round_id/scores`:
+
+```json
+{
+  "mutation_id": "UUID",
+  "hole": 1,
+  "roster_version": 0,
+  "target_version": 0,
+  "entries": [{ "slot_id": "UUID", "strokes": 4, "version": 0 }]
+}
+```
+
+- entries는 현재 사용자가 선택한 입력 대상 전체와 정확히 같아야 합니다. 1~8명, 중복/다른 라운드/삭제 슬롯 불가. 개인 목록 변경 또는 플레이어 목록 변경은 `targets_changed`로 거절합니다.
+- strokes는 1~999의 정수 또는 null. null은 삭제/미입력입니다. 0, 소수, 문자열은 거절합니다. hole은 실제 라운드 9/18홀 범위여야 합니다.
+- 저장된 값과 같으면 성공하되 버전/감사 이력/라운드 갱신 시각은 바꾸지 않습니다.
+- 다른 값이며 버전이 오래됐으면 HTTP 409 `{error:"score_conflict",conflicts:[{slot_id,strokes,version,proposed}],sheet}`를 반환하고 전체 쓰기를 보류합니다. UI는 최신 값 → 제안 값을 표시합니다.
+- 확인 후 conflicts의 최신 version을 넣어 새 mutation_id로 재요청합니다. 그 사이 값/버전이 바뀌면 다시 충돌합니다. 값이 변경됐다 돌아온 경우도 버전으로 검출합니다. 이미 같은 목표 값이 저장된 경우는 성공으로 처리합니다.
+- 성공은 `{sheet,replayed}`. 동일 mutation_id와 동일 내용을 재시도하면 실행을 반복하지 않고 최신 sheet와 replayed=true를 반환합니다. 다른 내용 재사용은 `request_reused`입니다. 원래 요청이 성공한 뒤 다른 사람이 수정했어도 재시도가 되덮어쓰지 않습니다.
+- 활성 기기, 참여자, active 라운드, 선택 목록/슬롯/점수 버전을 실제 D1 batch에서 다시 검사합니다. 한 점수라도 검사가 실패하면 변경 이력과 다른 점수까지 모두 롤백합니다.
+- 점수와 다른 참여자의 슬롯 삭제가 경쟁해도 같은 트랜잭션의 삭제/점수 존재 검사가 오래된 쓰기를 막습니다.
+- ended 라운드에는 쓰기를 거절합니다. 종료+24시간 수신자 본인 수정은 8단계 API에서 별도로 추가합니다.
+- 점수 입력에는 광고 정산을 요구하거나 생성하지 않습니다.

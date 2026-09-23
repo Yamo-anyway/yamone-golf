@@ -137,7 +137,7 @@ const en: Record<keyof typeof ko, string> = {
   inviteSent: "Invitation sent.",
   inviteHelp: "The invitation appears on their home screen.",
   stage2RoundHelp:
-    "You can now manage players and your scoring list. Scoring and ending rounds come in later stages.",
+    "Manage players, choose your scoring list and enter scores. Ending rounds comes in a later stage.",
   pendingRound: "Pending round action",
   resumeRound: "Resume action",
   roundReview: "Review round action",
@@ -262,5 +262,47 @@ const en: Record<keyof typeof ko, string> = {
   delete_changed:
     "The state changed after deletion review. Check the impact again.",
   last_player: "The last player cannot be deleted.",
+  scoreEntry: "Enter scores",
+  scorecard: "Scorecard · Rankings",
+  holeScope: "All my selected players on this hole",
+  saveHole: "Save this hole",
+  editHole: "Update this hole",
+  deleteHole: "Delete this hole",
+  holeSaved: "Saved on the server.",
+  noScoreTargets: "Select players to enter their scores.",
+  scoreDefault: "Not entered · PAR default",
+  scoreUnsaved: "Unsaved",
+  scoreSaved: "Saved",
+  decreaseScore: "Decrease strokes",
+  increaseScore: "Increase strokes",
+  previousHole: "Previous hole",
+  nextHole: "Next hole",
+  scoreRefreshHelp:
+    "Scores refresh on entry, hole changes and manual refresh. Your unsaved scores stay intact.",
+  scoreLeaveTitle: "You have unsaved scores",
+  scoreLeaveHelp:
+    "What would you like to do with this hole? You will stay here if saving fails.",
+  saveAndMove: "Save and continue",
+  discardAndMove: "Discard and continue",
+  deleteHoleHelp:
+    "Clear this hole for the selected players? Other players and holes keep their scores.",
+  scoreConflictTitle: "Another scorer changed the score",
+  scoreConflictHelp:
+    "Nothing was saved. Change the latest score → your proposed score?",
+  overwriteScores: "Confirm these changes",
+  useLatestScores: "No · Use latest scores",
+  latestApplied:
+    "Conflicting scores now use the latest values. Your other edits are preserved.",
+  notEntered: "Not entered",
+  cumulativeRank: "Current cumulative ranking",
+  holeRank: "Hole ranking",
+  rankHelp:
+    "Lowest strokes first · Ties share a rank · Check completed hole counts.",
+  scoreLegend:
+    "Par: number · Birdie or better: circle · Bogey: box · Double bogey or worse: two boxes",
+  invalid_score:
+    "Check the hole and scores. Strokes must be whole numbers from 1 to 999.",
+  score_conflict: "Review the latest scores.",
+  total: "Total",
 };
 export default en;

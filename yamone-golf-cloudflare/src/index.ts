@@ -144,7 +144,7 @@ async function route(request: Request, env: Env) {
     await env.DB.prepare("SELECT 1 AS ok").first();
     return json({
       status: "ok",
-      version: "0.3.2",
+      version: "0.3.3",
       environment: env.ENVIRONMENT,
       server_time: now(),
     });
@@ -234,7 +234,7 @@ export default {
       );
       response.headers.set(
         "Access-Control-Allow-Methods",
-        "GET, POST, PATCH, DELETE, OPTIONS",
+        "GET, POST, PUT, PATCH, DELETE, OPTIONS",
       );
     }
     return response;

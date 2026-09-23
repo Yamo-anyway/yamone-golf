@@ -43,11 +43,15 @@ async function main() {
       await setTimeout(200);
     }
     if (!ready) throw new Error("Test server startup timed out");
-    for (const file of [
-      "tests/identity-ui.ts",
-      "tests/rounds-ui.ts",
-      "tests/players-ui.ts",
-    ]) {
+    const requested = process.argv.slice(2);
+    for (const file of requested.length
+      ? requested
+      : [
+          "tests/identity-ui.ts",
+          "tests/rounds-ui.ts",
+          "tests/players-ui.ts",
+          "tests/scores-ui.ts",
+        ]) {
       const code = await new Promise<number | null>((resolve, reject) => {
         const test = spawn(process.execPath, ["--import", "tsx", file], {
           stdio: "inherit",
