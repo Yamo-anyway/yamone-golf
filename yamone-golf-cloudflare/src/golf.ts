@@ -10,7 +10,7 @@ import {
   type Check,
 } from "./round-store";
 import { personalRecordsRoute } from "./personal-records";
-import { peoriaHistoryRoute } from "./peoria-history";
+import { peoriaRoute } from "./peoria";
 import { recordsRoute } from "./records";
 import { lifecycleRoute } from "./round-lifecycle";
 import { scoresRoute } from "./scores";
@@ -315,7 +315,7 @@ export async function golfRoute(request: Request, env: Env): Promise<Response> {
     await limit(request, env, `golf:${d.user_id}`, 120, 60_000);
   const personal = await personalRecordsRoute(request, env, d);
   if (personal) return personal;
-  const peoria = await peoriaHistoryRoute(request, env, d);
+  const peoria = await peoriaRoute(request, env, d);
   if (peoria) return peoria;
   const records = await recordsRoute(request, env, d);
   if (records) return records;

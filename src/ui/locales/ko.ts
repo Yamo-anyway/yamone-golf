@@ -493,4 +493,63 @@ export default {
   allRecords: "전체 기록",
   noMatchingRecords: "조건에 맞는 기록이 없습니다.",
   myScore: "내 점수",
+  peoriaTitle: "신페리오",
+  peoriaCalculate: "신페리오 계산",
+  peoriaRecalculate: "신페리오 재계산",
+  peoriaCount: "저장된 결과",
+  peoriaDeadline: "계산 마감",
+  peoriaCalculateConfirm: "신페리오를 계산할까요?",
+  peoriaRecalculateConfirm: "새 조건으로 재계산할까요?",
+  peoriaTargetPlayers: "계산 대상",
+  peoriaExcludeConfirm: "미완료 플레이어를 제외하고 계산합니다.",
+  peoriaFirstWarning:
+    "계산자와 시각을 기록하고 결과를 보관합니다. 총 3개 결과 중 1개를 사용합니다.",
+  peoriaRecalculateWarning:
+    "숨김 홀을 새로 추첨하여 순위가 달라질 수 있습니다. 기존 결과는 보존하며 남은 계산 횟수 1회를 사용합니다.",
+  peoriaExcludeAndCalculate: "미완료 제외하고 계산",
+  peoriaResult: "결과",
+  peoriaLatest: "최신",
+  peoriaEmpty: "아직 계산한 결과가 없습니다.",
+  peoriaGross: "총타수",
+  peoriaHandicap: "핸디캡",
+  peoriaNet: "네트 점수",
+  peoriaExcluded: "제외 선수",
+  peoriaHistoryTitle: "계산 이력",
+  peoriaStale:
+    "계산 후 원본 기록이 변경되었습니다. 이 결과는 계산 당시 점수로 보존됩니다.",
+  peoriaShowSnapshot: "계산 당시 전체 점수 보기",
+  peoriaHideSnapshot: "당시 점수 접기",
+  peoriaRules: "계산 기준 보기",
+  peoriaProfile:
+    "18홀 PAR 72 · 숨김 12홀 · 홀별 더블파 제한 · 핸디캡 0~36 · 네트 점수가 같으면 공동 순위",
+  peoriaFormula:
+    "핸디캡 = (숨김 홀 제한 타수 합계 × 1.5 − 72) × 0.8. 네트 점수는 실제 총타수에서 핸디캡을 뺍니다. 소수점 첫째 자리까지 표시합니다.",
+  peoriaHiddenHelp:
+    "전반과 후반에서 PAR 합계 24인 6홀씩 서버가 추첨합니다. 선수 전체에 같은 숨김 홀을 적용하며 선정된 홀은 공개하지 않습니다.",
+  peoriaSaved: "계산 결과가 저장되었습니다.",
+  peoriaPending:
+    "계산 결과 확인이 필요합니다. 같은 요청을 다시 확인하며 중복 계산하지 않습니다.",
+  peoriaRejected:
+    "이 요청은 실행되지 않았습니다. 최신 상태를 확인한 뒤 다시 계산할 수 있습니다.",
+  peoriaRetry: "계산 결과 다시 확인",
+  peoriaCheckAgain: "최신 상태 확인",
+  resumePeoria: "신페리오 결과 확인 이어서",
+  peoria_forbidden:
+    "생성자와 종료 권한을 위임받은 참여자만 계산할 수 있습니다.",
+  peoria_expired:
+    "라운드 종료 후 3시간이 지나 계산이 잠겼습니다. 저장된 결과는 계속 볼 수 있습니다.",
+  peoria_limit:
+    "총 3개 결과를 모두 사용했습니다. 더 이상 재계산할 수 없습니다.",
+  peoria_no_players: "18홀을 모두 입력한 플레이어가 없습니다.",
+  peoria_course_unsupported:
+    "18홀 PAR 72이며 전·후반에서 각각 PAR 합계 24인 6홀을 선정할 수 있는 코스만 계산할 수 있습니다.",
+  peoria_changed:
+    "점수·선수 또는 계산 이력이 변경되었습니다. 최신 명단으로 다시 확인해 주세요.",
+  peoria_exclusion_required: "미완료 선수 제외 여부를 확인해 주세요.",
+  peoria_recalculation_required: "재계산 안내를 확인해 주세요.",
+  peoria_pending_exists: "이전에 요청한 신페리오 결과를 먼저 확인해 주세요.",
+  peoria_pending_corrupt:
+    "보관한 계산 요청을 읽을 수 없습니다. 원래 데이터는 유지했습니다.",
+  peoria_history_invalid:
+    "계산 이력을 읽을 수 없습니다. 잠시 후 다시 확인해 주세요.",
 };

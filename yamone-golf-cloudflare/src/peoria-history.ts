@@ -1,12 +1,11 @@
-import type { PeoriaHistory, PeoriaRun } from "../../shared/peoria";
-import { ApiError, json, type Device, type Env } from "./shared";
-import { getRound, stmt, uid } from "./round-store";
+import type { PeoriaRun } from "../../shared/peoria";
+import { ApiError } from "./shared";
 
 // Never SELECT *: private draw data must not leave D1 on a history read.
 export const peoriaPublicColumns = `p.run_id,p.round_id,p.ordinal,p.calculated_at,
   p.actor_id,p.actor_name,p.source_record_version,p.algorithm_version,
   p.snapshot_json,p.target_slots_json,p.excluded_slots_json,p.results_json`;
-type HistoryRow = Omit<
+export type HistoryRow = Omit<
   PeoriaRun,
   "snapshot" | "target_slot_ids" | "excluded_slot_ids" | "results"
 > & {
@@ -113,48 +112,4 @@ export function publicPeoriaRun(row: HistoryRow): PeoriaRun {
     excluded_slot_ids: excluded,
     results,
   };
-}
-export async function peoriaHistoryRoute(
-  request: Request,
-  env: Env,
-  d: Device,
-): Promise<Response | null> {
-  const match = new URL(request.url).pathname.match(
-    /^\/api\/rounds\/([^/]+)\/peoria$/,
-  );
-  if (!match || request.method !== "GET") return null;
-  const id = uid(match[1]);
-  await getRound(env, id); // Apply the existing server inactivity rule before reading.
-  const access = `r.round_id=? AND (
-    EXISTS(SELECT 1 FROM round_participants m WHERE m.round_id=r.round_id AND m.user_id=?) OR
-    EXISTS(SELECT 1 FROM receipts q WHERE q.round_id=r.round_id AND q.user_id=? AND q.status='received'))`;
-  const [rounds, history] = await env.DB.batch([
-    stmt(
-      env,
-      `SELECT r.status,r.record_version FROM rounds r WHERE ${access}`,
-      id,
-      d.user_id,
-      d.user_id,
-    ),
-    stmt(
-      env,
-      `SELECT ${peoriaPublicColumns} FROM peoria_runs p JOIN rounds r ON r.round_id=p.round_id WHERE ${access} AND r.status='ended' ORDER BY p.ordinal DESC`,
-      id,
-      d.user_id,
-      d.user_id,
-    ),
-  ]);
-  const r = rounds.results[0] as
-    { status: string; record_version: number } | undefined;
-  if (!r) throw new ApiError("forbidden", 403);
-  if (r.status !== "ended") throw new ApiError("round_not_ended", 409);
-  const runs = (history.results as HistoryRow[]).map(publicPeoriaRun);
-  const result: PeoriaHistory = {
-    round_id: id,
-    record_version: r.record_version,
-    latest_run_id: runs[0]?.run_id ?? null,
-    runs,
-    calculation: { available: false, reason: "policy_pending" },
-  };
-  return json(result);
 }

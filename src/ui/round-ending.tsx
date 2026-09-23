@@ -8,6 +8,7 @@ import { Button, Card, colors, Txt } from "./components";
 import { Heading, Problem } from "./courses";
 import { confirm, useLoad, useTask } from "./golf-hooks";
 import { useOfflineScores } from "./offline-scores";
+import { PeoriaEntry } from "./peoria";
 import { useSession } from "./session";
 export function Completion({ data }: { data: EndView }) {
   const { t, lang } = useSession();
@@ -51,6 +52,7 @@ export function EndedRoundSummary({ id }: { id: string }) {
     <>
       <Problem text={query.errorText} />
       {query.data && <Completion data={query.data} />}
+      {query.data?.status === "ended" && <PeoriaEntry id={id} />}
     </>
   );
 }
@@ -261,6 +263,7 @@ export function RoundEndingScreen() {
           }
         />
       )}
+      {data?.status === "ended" && <PeoriaEntry id={id} />}
       {data?.status === "ended" && (
         <Button
           label={t("roundRecords")}

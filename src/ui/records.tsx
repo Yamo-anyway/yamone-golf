@@ -1,6 +1,8 @@
 import React, { useRef, useState } from "react";
 import { View } from "react-native";
 import type { RecordFilter } from "../../shared/personal-records";
+import { PeoriaEntry } from "./peoria";
+import { peoriaFlow } from "../data/peoria";
 import { corrections } from "../data/corrections";
 import { router, useLocalSearchParams } from "expo-router";
 import { records, receiptFlow, receiveAPI } from "../data/records";
@@ -44,6 +46,7 @@ export function RecordsHomeEntry() {
   const query = useLoad(async () => ({
     inbox: await records.inbox(),
     pending: await receiptFlow(profile!.user_id).read(),
+    peoria: await peoriaFlow(profile!.user_id).read(),
     corrections: await corrections(profile!.user_id).summaries(),
   }));
   return (
@@ -69,6 +72,19 @@ export function RecordsHomeEntry() {
         secondary
         onPress={() => router.push("/records")}
       />
+      {query.data?.peoria && (
+        <Button
+          label={t("resumePeoria")}
+          testID="home-resume-peoria"
+          secondary
+          onPress={() =>
+            router.push({
+              pathname: "/peoria",
+              params: { id: query.data!.peoria!.round_id, origin: "round" },
+            })
+          }
+        />
+      )}
       {query.data?.corrections.map((r) => (
         <Button
           key={r.receipt_id}
@@ -592,6 +608,7 @@ export function RecordScreen() {
               </Txt>
             )}
           </Card>
+          <PeoriaEntry id={data.receipt.round_id} origin="record" />
           <ScorecardContent sheet={data.sheet} />
           {data.can_manage && (
             <Button

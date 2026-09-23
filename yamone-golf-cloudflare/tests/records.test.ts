@@ -790,7 +790,7 @@ test("stage 6 upgrade preserves existing round ads and data while adding receive
 });
 
 // History fixtures are deliberately inserted into test D1; no production calculation exists yet.
-async function peoriaFixture() {
+async function peoriaFixture(delegate = false) {
   const f = await fixture(2);
   for (let h = 1; h <= 18; h++) {
     const saved = await save(
@@ -799,6 +799,7 @@ async function peoriaFixture() {
     );
     assert.equal(saved.status, 200);
   }
+  if (delegate) await permission(f, f.a, f.b, true);
   await end(f);
   const own = await link(f, 0, f.a),
     visitor = await link(f, 1, f.c);
@@ -865,7 +866,7 @@ async function seedPeoria(f: any, ordinal = 1, mutate?: (v: any) => void) {
     .run();
   return v;
 }
-test("Peoria history requires an ended round and membership or a current receipt; calculation stays unavailable", async () => {
+test("Peoria history requires an ended round and membership or a current receipt; ordinary members cannot calculate", async () => {
   const f = await fixture(2);
   assert.equal(
     (await req(f.path + "/peoria", f.a.token)).data.error,
@@ -876,12 +877,13 @@ test("Peoria history requires an ended round and membership or a current receipt
   assert.equal(history.status, 200);
   assert.deepEqual(history.data.runs, []);
   assert.equal(history.data.latest_run_id, null);
-  assert.deepEqual(history.data.calculation, {
-    available: false,
-    reason: "policy_pending",
-  });
+  assert.equal(history.data.calculation.available, false);
+  assert.equal(history.data.calculation.reason, "peoria_forbidden");
   assert.equal((await req(f.path + "/peoria", f.c.token)).status, 403);
-  assert.equal((await req(f.path + "/peoria", f.a.token, {})).status, 404);
+  assert.equal(
+    (await req(f.path + "/peoria", f.a.token, {}, "PUT")).status,
+    404,
+  );
 });
 test("Peoria has at most three integer ordinals and returns latest first without overwriting old runs", async () => {
   const f = await peoriaFixture();
@@ -994,4 +996,293 @@ test("malformed history is rejected without echoing private stored data", async 
   assert.equal(r.status, 500);
   assert.equal(r.data.error, "peoria_history_invalid");
   assert.doesNotMatch(JSON.stringify(r.data), /PRIVATE|hidden_holes/);
+});
+
+const THREE_HOURS = 10800000;
+async function peoriaRequest(f: any, who = f.a) {
+  const h = (await req(f.path + "/peoria", who.token)).data;
+  return {
+    user_id: who.user_id,
+    request_id: randomUUID(),
+    record_version: h.record_version,
+    expected_runs: Math.min(2, h.runs.length),
+    confirmation_token: h.calculation.confirmation_token,
+    exclude_incomplete: true,
+    confirm_recalculation: h.runs.length > 0,
+  };
+}
+test("Peoria executes for creator and delegated member, requires both confirmations, rejects receivers and client-selected holes", async () => {
+  const f = await peoriaFixture(true),
+    path = f.path + "/peoria";
+  let w = await peoriaRequest(f);
+  assert.equal(
+    (await req(path, f.a.token, { ...w, hidden_holes: [1] })).data.error,
+    "invalid_request",
+  );
+  assert.equal(
+    (await req(path, f.a.token, { ...w, exclude_incomplete: false })).data
+      .error,
+    "peoria_exclusion_required",
+  );
+  const first = await req(path, f.a.token, w);
+  assert.equal(first.status, 201, JSON.stringify(first));
+  w = await peoriaRequest(f, f.b);
+  assert.equal(
+    (await req(path, f.b.token, { ...w, confirm_recalculation: false })).data
+      .error,
+    "peoria_recalculation_required",
+  );
+  assert.equal((await req(path, f.b.token, w)).status, 201);
+  await received(f, f.visitor, f.c);
+  assert.equal(
+    (await req(path, f.c.token, await peoriaRequest(f, f.c))).data.error,
+    "peoria_forbidden",
+  );
+  const h = (await req(path, f.c.token)).data;
+  assert.equal(h.runs.length, 2);
+  assert.equal(h.runs[0].actor_id, f.b.user_id);
+  assert.deepEqual(h.runs[0].target_slot_ids, [f.own.slot_id]);
+  assert.deepEqual(h.runs[0].excluded_slot_ids, [f.visitor.slot_id]);
+  assert.doesNotMatch(JSON.stringify(h), /hidden_holes|request_hash/);
+  const privateRow = await db
+    .prepare("SELECT hidden_holes_json FROM peoria_runs WHERE run_id=?")
+    .bind(first.data.run_id)
+    .first<any>();
+  const hidden = JSON.parse(privateRow.hidden_holes_json);
+  assert.equal(hidden.length, 12);
+  assert.equal(new Set(hidden).size, 12);
+});
+test("Peoria rechecks scores and names during confirmation and preserves old snapshots after explicit recalculation", async () => {
+  const f = await peoriaFixture(),
+    path = f.path + "/peoria",
+    r = await received(f, f.own, f.a);
+  const w = await peoriaRequest(f);
+  await db
+    .prepare("UPDATE users SET nickname=? WHERE user_id=?")
+    .bind("바뀐 닉네임", f.a.user_id)
+    .run();
+  assert.equal((await req(path, f.a.token, w)).data.error, "peoria_changed");
+  const next = await peoriaRequest(f);
+  assert.equal((await req(path, f.a.token, next)).status, 201);
+  const before = (await req(path, f.a.token)).data.runs[0];
+  const stale = await peoriaRequest(f);
+  const scorePath = "/api/records/" + r.receipt.receipt_id + "/scores",
+    view = (await req(scorePath, f.a.token)).data;
+  assert.equal(
+    (
+      await req(
+        scorePath,
+        f.a.token,
+        {
+          user_id: f.a.user_id,
+          mutation_id: randomUUID(),
+          player_slot_id: f.own.slot_id,
+          slot_version: view.slot_version,
+          hole: 1,
+          strokes: 5,
+          version: 1,
+        },
+        "PUT",
+      )
+    ).status,
+    200,
+  );
+  assert.equal(
+    (await req(path, f.a.token, stale)).data.error,
+    "peoria_changed",
+  );
+  assert.equal(
+    (await req(path, f.a.token, await peoriaRequest(f))).status,
+    201,
+  );
+  const history = (await req(path, f.a.token)).data;
+  assert.deepEqual(history.runs[1], before);
+  assert.equal(history.runs[0].snapshot.players[0].scores[0], 5);
+  assert.equal(history.runs[1].snapshot.players[0].scores[0], 4);
+});
+test("Peoria requests replay after expiry without new draws and reject reused payloads or a moved device", async () => {
+  const f = await peoriaFixture(),
+    path = f.path + "/peoria",
+    w = await peoriaRequest(f);
+  const done = await req(path, f.a.token, w);
+  assert.equal(done.status, 201);
+  const before = await db
+    .prepare("SELECT * FROM peoria_runs WHERE run_id=?")
+    .bind(done.data.run_id)
+    .first();
+  await db
+    .prepare("UPDATE rounds SET ended_at=? WHERE round_id=?")
+    .bind(Date.now() - THREE_HOURS, f.r.round_id)
+    .run();
+  const again = await req(path, f.a.token, w);
+  assert.equal(again.status, 200);
+  assert.equal(again.data.run_id, done.data.run_id);
+  assert.equal(again.data.replayed, true);
+  assert.equal(
+    (await req(path, f.a.token, { ...w, request_id: randomUUID() })).data.error,
+    "peoria_expired",
+  );
+  assert.equal(
+    (await req(path, f.a.token, { ...w, confirm_recalculation: true })).data
+      .error,
+    "request_reused",
+  );
+  assert.deepEqual(
+    await db
+      .prepare("SELECT * FROM peoria_runs WHERE run_id=?")
+      .bind(done.data.run_id)
+      .first(),
+    before,
+  );
+  await db
+    .prepare("UPDATE devices SET revoked_at=? WHERE user_id=?")
+    .bind(Date.now(), f.a.user_id)
+    .run();
+  assert.equal((await req(path, f.a.token, w)).status, 401);
+});
+test("concurrent Peoria requests are idempotent or require reconfirmation and cannot consume a fourth result", async () => {
+  const f = await peoriaFixture(),
+    path = f.path + "/peoria",
+    w = await peoriaRequest(f);
+  const same = await Promise.all([
+    req(path, f.a.token, w),
+    req(path, f.a.token, w),
+  ]);
+  assert.ok(
+    same.every((r) => r.status === 200 || r.status === 201),
+    JSON.stringify(same),
+  );
+  assert.equal(same[0].data.run_id, same[1].data.run_id);
+  for (let ordinal = 2; ordinal <= 3; ordinal++) {
+    const next = await peoriaRequest(f);
+    const results = await Promise.all([
+      req(path, f.a.token, next),
+      req(path, f.a.token, { ...next, request_id: randomUUID() }),
+    ]);
+    assert.equal(
+      results.filter((r) => r.status === 201).length,
+      1,
+      JSON.stringify(results),
+    );
+    assert.equal(results.filter((r) => r.status === 409).length, 1);
+    assert.equal((await req(path, f.a.token)).data.runs.length, ordinal);
+  }
+  assert.equal(
+    (await req(path, f.a.token, await peoriaRequest(f))).data.error,
+    "peoria_limit",
+  );
+});
+test("Peoria validates deadline, permissions and source version inside the actual write transaction", async () => {
+  const worker = (await import("../src/index")).default;
+  for (const reason of ["deadline", "permission", "score"]) {
+    const f = await peoriaFixture(true),
+      w = await peoriaRequest(f, f.b);
+    let writes = false,
+      intercepted = false;
+    const proxy = new Proxy(db, {
+      get(target, key) {
+        if (key === "prepare")
+          return (sql: string) => {
+            if (sql.includes("INSERT INTO mutation_guards")) writes = true;
+            return target.prepare(sql);
+          };
+        if (key === "batch")
+          return async (ss: any[]) => {
+            if (writes && !intercepted) {
+              intercepted = true;
+              if (reason === "deadline")
+                await db
+                  .prepare("UPDATE rounds SET ended_at=? WHERE round_id=?")
+                  .bind(Date.now() - THREE_HOURS, f.r.round_id)
+                  .run();
+              if (reason === "permission")
+                await db
+                  .prepare(
+                    "UPDATE round_participants SET can_end=0 WHERE round_id=? AND user_id=?",
+                  )
+                  .bind(f.r.round_id, f.b.user_id)
+                  .run();
+              if (reason === "score")
+                await db
+                  .prepare(
+                    "UPDATE rounds SET record_version=record_version+1 WHERE round_id=?",
+                  )
+                  .bind(f.r.round_id)
+                  .run();
+            }
+            return target.batch(ss);
+          };
+        const x = Reflect.get(target, key);
+        return typeof x === "function" ? x.bind(target) : x;
+      },
+    });
+    const response = await worker.fetch(
+      new Request("https://api.test" + f.path + "/peoria", {
+        method: "POST",
+        headers: {
+          Authorization: "Bearer " + f.b.token,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(w),
+      }),
+      {
+        DB: proxy as any,
+        ENVIRONMENT: "test",
+        ALLOWED_ORIGINS: "https://app.test",
+      },
+    );
+    assert.equal(intercepted, true);
+    assert.ok([403, 409].includes(response.status));
+    assert.equal(
+      (
+        await db
+          .prepare("SELECT COUNT(*) n FROM peoria_runs WHERE round_id=?")
+          .bind(f.r.round_id)
+          .first<any>()
+      ).n,
+      0,
+    );
+    assert.equal(
+      (await db.prepare("SELECT COUNT(*) n FROM mutation_guards").first<any>())
+        .n,
+      0,
+    );
+  }
+});
+test("Peoria rejects incomplete-only, nine-hole and unsupported PAR rounds without consuming results", async () => {
+  const f = await fixture(2);
+  await end(f);
+  assert.equal(
+    (await req(f.path + "/peoria", f.a.token)).data.calculation.reason,
+    "peoria_no_players",
+  );
+  await db
+    .prepare("UPDATE rounds SET hole_count=9 WHERE round_id=?")
+    .bind(f.r.round_id)
+    .run();
+  assert.equal(
+    (await req(f.path + "/peoria", f.a.token)).data.calculation.reason,
+    "peoria_course_unsupported",
+  );
+  const g = await peoriaFixture();
+  const course = {
+    name: "PAR 70",
+    segments: [
+      { name: "OUT", pars: [3, 4, 3, 5, 4, 4, 3, 5, 4] },
+      { name: "IN", pars: [3, 4, 3, 5, 4, 4, 3, 5, 4] },
+    ],
+  };
+  await db
+    .prepare("UPDATE rounds SET course_snapshot=? WHERE round_id=?")
+    .bind(JSON.stringify(course), g.r.round_id)
+    .run();
+  assert.equal(
+    (await req(g.path + "/peoria", g.a.token, await peoriaRequest(g))).data
+      .error,
+    "peoria_course_unsupported",
+  );
+  assert.equal(
+    (await db.prepare("SELECT COUNT(*) n FROM peoria_runs").first<any>()).n,
+    0,
+  );
 });

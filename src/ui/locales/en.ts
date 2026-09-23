@@ -495,5 +495,64 @@ const en: Record<keyof typeof ko, string> = {
   allRecords: "All records",
   noMatchingRecords: "No records match these filters.",
   myScore: "My score",
+  peoriaTitle: "New Peoria",
+  peoriaCalculate: "Calculate New Peoria",
+  peoriaRecalculate: "Recalculate New Peoria",
+  peoriaCount: "Saved results",
+  peoriaDeadline: "Calculation deadline",
+  peoriaCalculateConfirm: "Calculate New Peoria?",
+  peoriaRecalculateConfirm: "Recalculate with a new draw?",
+  peoriaTargetPlayers: "Included players",
+  peoriaExcludeConfirm: "Incomplete players will be excluded.",
+  peoriaFirstWarning:
+    "The result, calculation time and person will be saved. This uses one of three results.",
+  peoriaRecalculateWarning:
+    "A fresh hidden-hole draw may change the rankings. Previous results stay saved. This uses one remaining calculation.",
+  peoriaExcludeAndCalculate: "Exclude incomplete players and calculate",
+  peoriaResult: "Result",
+  peoriaLatest: "Latest",
+  peoriaEmpty: "No results yet.",
+  peoriaGross: "Gross",
+  peoriaHandicap: "Handicap",
+  peoriaNet: "Net",
+  peoriaExcluded: "Excluded",
+  peoriaHistoryTitle: "Calculation history",
+  peoriaStale:
+    "The original record has changed. This result retains the scores used at calculation time.",
+  peoriaShowSnapshot: "View all scores used for this result",
+  peoriaHideSnapshot: "Hide calculation scores",
+  peoriaRules: "View calculation rules",
+  peoriaProfile:
+    "18 holes, PAR 72 · 12 hidden holes · Double-par hole cap · Handicap 0–36 · Equal net scores share a rank",
+  peoriaFormula:
+    "Handicap = (sum of capped hidden-hole strokes × 1.5 − 72) × 0.8. Net = actual gross score minus handicap. Results display one decimal place.",
+  peoriaHiddenHelp:
+    "The server draws six holes totaling PAR 24 from each nine. Every player uses the same hidden holes. Selected holes are never displayed.",
+  peoriaSaved: "Calculation result saved.",
+  peoriaPending:
+    "The calculation needs confirmation. Retry the same request without creating a duplicate result.",
+  peoriaRejected:
+    "This request was not executed. Check the latest state before calculating again.",
+  peoriaRetry: "Check calculation result again",
+  peoriaCheckAgain: "Check latest state",
+  resumePeoria: "Resume calculation confirmation",
+  peoria_forbidden:
+    "Only the creator and participants with delegated ending permission can calculate.",
+  peoria_expired:
+    "Calculations closed three hours after round end. Saved results remain available.",
+  peoria_limit:
+    "All three results have been used. No more recalculations are available.",
+  peoria_no_players: "No player has completed all 18 holes.",
+  peoria_course_unsupported:
+    "Calculation requires 18 holes at PAR 72, with six holes totaling PAR 24 selectable from each nine.",
+  peoria_changed:
+    "Scores, players or calculation history changed. Review the latest list again.",
+  peoria_exclusion_required: "Confirm that incomplete players can be excluded.",
+  peoria_recalculation_required: "Confirm the recalculation warning.",
+  peoria_pending_exists: "Confirm the previous calculation request first.",
+  peoria_pending_corrupt:
+    "The saved calculation request could not be read. Its original data was preserved.",
+  peoria_history_invalid:
+    "Calculation history could not be read. Please try again.",
 };
 export default en;

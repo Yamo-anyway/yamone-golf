@@ -173,7 +173,7 @@ PATCH action:
 
 개인 삭제는 공동 라운드/점수/다른 사람의 기록과 과거 received 전송을 변경하지 않습니다. 삭제한 RECEIPT의 재조회·수신 재시도는 deleted 상태를 반환하고 sheet는 null입니다. 새로운 명시적 전송만 새 수신 항목이 됩니다. 예전 삭제 요청은 나중에 받은 새 RECEIPT를 삭제하지 않습니다.
 
-sheet는 전체 플레이어·홀별 점수·코스/PAR을 포함하는 읽기 전용 원본 조회입니다. 비참여 수신자에게 공동 입력 권한을 부여하지 않습니다. current_player는 현재 슬롯의 연결 사용자 일치 여부이고 can_manage는 기존 참여자인지 나타냅니다. peoria_runs는 9단계 준비부터 저장된 공개 신페리오 이력을 최신 순으로 반환합니다. 계산 쓰기는 미연결이며 이력이 없으면 빈 배열입니다.
+sheet는 전체 플레이어·홀별 점수·코스/PAR을 포함하는 읽기 전용 원본 조회입니다. 비참여 수신자에게 공동 입력 권한을 부여하지 않습니다. current_player는 현재 슬롯의 연결 사용자 일치 여부이고 can_manage는 기존 참여자인지 나타냅니다. peoria_runs는 저장된 공개 신페리오 이력을 최신 순으로 반환합니다. 이력이 없으면 빈 배열입니다.
 
 추가 오류: record_not_found/delivery_not_found(404), delivery_unavailable/already_received/player_link_changed/request_reused/user_changed/ad_required(409), forbidden(403), ads_not_configured(503). 서버 성공 전에는 앱에서 수신 완료로 표시하지 않습니다.
 
@@ -209,14 +209,21 @@ sheet는 전체 플레이어·홀별 점수·코스/PAR을 포함하는 읽기 �
 
 오류: record_edit_forbidden(403), record_deleted/record_unlinked/record_locked/player_link_changed/score_conflict/user_changed/request_reused/state_changed(409), invalid_score(400). 비소유 RECEIPT는 record_not_found(404)이며 폐기 기기는 401입니다. 상태 경쟁 시 재검사하거나 전체 트랜잭션을 롤백합니다.
 
-## 신페리오 이력 — 9단계 준비
+## 신페리오 — 9단계
 
 `GET /api/rounds/:round_id/peoria`
 
-- 활성 기기 인증 필요. 해당 라운드의 기존 참여자 또는 현재 received 개인 기록 수신자만 조회합니다.
-- 진행 중 라운드는 `409 round_not_ended`. 무권한 사용자는 `403 forbidden`입니다.
-- 응답: `round_id`, 현재 `record_version`, `latest_run_id`(없으면 null), `runs`(최신 순), `calculation: {available:false, reason:"policy_pending"}`.
-- 각 이력: 식별자/순번/계산 시각/계산자 당시 이름/원본 버전/알고리즘 버전/코스명·PAR·전체 선수 점수 Snapshot/대상·제외 슬롯 ID/총타수·핸디캡·네트 점수·순위.
-- 숨김 홀과 내부 요청 ID/해시를 반환하지 않습니다. 상세 타입은 shared/peoria.ts입니다.
-- 동일 공개 이력은 `GET /api/records/:receipt_id`의 `peoria_runs`에도 포함합니다. 삭제된 RECEIPT에는 빈 배열, 다른 사용자 RECEIPT는 404입니다.
-- 아직 POST/PUT/PATCH/DELETE 또는 계산 엔진은 제공하지 않습니다. 정책 제안과 후속 구현은 PEORIA.md 참조.
+- 활성 기기 인증 필요. 생성자/기존 참여자 또는 현재 received 수신자만 조회합니다. 진행 중은 409 round_not_ended, 무권한은 403 forbidden입니다.
+- 응답: round_id, 현재 record_version, latest_run_id(없으면 null), runs(최신 순), calculation.
+- calculation: available, reason, deadline, server_time, confirmation_token, targets/excluded(슬롯ID·당시 이름·입력 홀 수).
+- reason: available / peoria_forbidden / peoria_expired / peoria_limit / peoria_no_players / peoria_course_unsupported.
+- 이력: 식별자·순번·시각·계산자/당시 이름·원본/계산 방식 버전·코스명/PAR/전체 선수 점수 Snapshot·대상/제외 슬롯ID·결과/순위. 공개 타입 shared/peoria.ts 참조.
+- 숨김 홀과 내부 실행 요청 ID/해시는 조회 응답에 포함하지 않습니다. 같은 공개 이력은 기록 상세 peoria_runs에도 포함하며 삭제된 RECEIPT에는 빈 배열, 다른 사용자 RECEIPT는 404입니다.
+
+`POST /api/rounds/:round_id/peoria`
+
+- 본문: user_id, request_id(UUID), record_version, expected_runs(0~2), confirmation_token(GET 값), exclude_incomplete(boolean), confirm_recalculation(boolean).
+- 미완료가 있으면 exclude_incomplete=true, 재계산이면 confirm_recalculation=true가 필요합니다. 임의 숨김 홀 등 알 수 없는 본문 필드는 거절합니다.
+- 생성자 또는 종료 위임 참여자만 종료+3시간 미만에 실행합니다. 현재 원본/이름/플레이어/이력/권한 버전이 확인 당시와 달라지면 peoria_changed(409)로 새 확인을 요구합니다.
+- 새 성공 201, 동일 요청 재확인 200. 응답 {request_id,run_id,replayed}. 원래 요청은 마감/횟수 소진 뒤에도 성공 결과를 재확인합니다. 본문을 바꾼 ID 재사용은 request_reused(409)입니다.
+- 계산 쓰기와 Snapshot·내부 추첨·중복방지 정보를 하나의 원자적 행으로 저장합니다. UPDATE/DELETE 실행 API는 없습니다. 내부 계산 정보는 ACK에 포함하지 않습니다.

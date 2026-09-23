@@ -30,11 +30,40 @@ export type PeoriaRun = {
   excluded_slot_ids: string[];
   results: PeoriaResult[];
 };
+export const PEORIA_WINDOW_MS = 3 * 60 * 60 * 1000;
+export type PeoriaReason =
+  | "available"
+  | "peoria_forbidden"
+  | "peoria_expired"
+  | "peoria_limit"
+  | "peoria_no_players"
+  | "peoria_course_unsupported";
 export type PeoriaHistory = {
   round_id: string;
   record_version: number;
   latest_run_id: string | null;
   runs: PeoriaRun[];
-  // Stage 9 foundation: no timing or calculation permission is assumed.
-  calculation: { available: false; reason: "policy_pending" };
+  calculation: {
+    available: boolean;
+    reason: PeoriaReason;
+    deadline: number;
+    server_time: number;
+    confirmation_token: string;
+    targets: { slot_id: string; name: string; holes_recorded: number }[];
+    excluded: { slot_id: string; name: string; holes_recorded: number }[];
+  };
+};
+export type PeoriaWrite = {
+  user_id: string;
+  request_id: string;
+  record_version: number;
+  expected_runs: number;
+  confirmation_token: string;
+  exclude_incomplete: boolean;
+  confirm_recalculation: boolean;
+};
+export type PeoriaAck = {
+  request_id: string;
+  run_id: string;
+  replayed: boolean;
 };

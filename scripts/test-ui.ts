@@ -35,6 +35,7 @@ async function main() {
           "tests/ending-ui.ts",
           "tests/records-ui.ts",
           "tests/personal-ui.ts",
+          "tests/peoria-ui.ts",
         ]) {
       // Each suite owns its D1 and rate-limit buckets. Production limits stay intact.
       const api = spawn(
