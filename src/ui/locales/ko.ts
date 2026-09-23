@@ -440,4 +440,57 @@ export default {
     "보관한 수신 요청을 읽을 수 없습니다. 원래 데이터를 유지했습니다.",
   receipt_pending_missing:
     "이어서 처리할 수신 요청이 없습니다. 받을 기록을 다시 선택해 주세요.",
+  statisticsTitle: "개인 통계",
+  statisticsHelp:
+    "내가 플레이어로 연결되어 있고 받은 기록 중 18홀을 모두 입력한 기록만 집계합니다. 9홀·신페리오 점수는 제외합니다.",
+  eligibleRounds: "통계 대상",
+  averageScore: "평균 타수",
+  bestScore: "최저 타수",
+  highestScore: "최고 타수",
+  averageToPar: "평균 PAR 대비",
+  noStatistics:
+    "아직 통계 대상 기록이 없습니다. 기록을 받고 본인의 18홀 입력 상태를 확인해 주세요.",
+  scoreDistribution: "홀별 스코어 분포",
+  eagle_or_better: "이글 이하",
+  birdie: "버디",
+  par: "파",
+  bogey: "보기",
+  double_or_worse: "더블보기 이상",
+  parAverages: "PAR별 평균 타수",
+  excludedRecords: "통계 제외 기록",
+  nineHoleRecords: "9홀 기록",
+  incompleteRecords: "미완료 기록",
+  unlinkedRecords: "본인 연결 해제",
+  recentStatistics: "최근 통계 대상 10라운드",
+  editMyScores: "내 점수 수정",
+  personalEditHelp:
+    "받은 기록의 본인 점수만 수정합니다. 저장하면 공동 원본과 통계에 반영됩니다. 초안은 이 기기에 보관되며 자동 전송하지 않습니다.",
+  editDeadline: "수정 가능 기한",
+  record_deleted:
+    "삭제한 개인 기록은 수정할 수 없습니다. 보관한 입력값은 유지됩니다.",
+  record_unlinked: "현재 본인과 연결된 플레이어가 아니므로 수정할 수 없습니다.",
+  record_locked: "라운드 종료 후 24시간이 지나 점수가 잠겼습니다.",
+  record_edit_forbidden: "본인의 플레이어 점수만 수정할 수 있습니다.",
+  correction_refresh:
+    "최신 기록을 조회한 뒤 수정해 주세요. 보관한 입력값은 유지됩니다.",
+  correction_pending: "이전 수정 요청의 결과를 먼저 확인해 주세요.",
+  correction_storage_corrupt:
+    "보관한 수정 데이터를 읽을 수 없습니다. 원래 데이터를 유지했습니다.",
+  discardCorrectionHelp:
+    "이 홀의 저장 전 수정값을 버릴까요? 서버 점수는 유지됩니다.",
+  deleteOwnHoleHelp:
+    "본인의 이 홀 점수를 미입력으로 바꿀까요? 18홀 미완료 상태가 되면 통계에서 제외됩니다.",
+  pendingDeleteOwnHole:
+    "이 홀을 미입력으로 변경하는 요청입니다. 표시된 PAR는 저장된 점수가 아닙니다.",
+  correctionPendingHelp:
+    "서버 반영 여부가 아직 확인되지 않았습니다. 같은 요청으로 결과를 다시 확인합니다.",
+  correctionBlockedHelp:
+    "수정 요청이 보류되었습니다. 권한과 기한을 새로 확인하세요. 입력값은 유지됩니다.",
+  correctionLeaveHelp:
+    "작성한 값은 이 기기에 보관됩니다. 저장 후 이동하거나 초안을 보관하고 이동할 수 있습니다.",
+  resumeCorrection: "점수 수정 이어서",
+  searchMyRecords: "내 기록 골프장 검색",
+  allRecords: "전체 기록",
+  noMatchingRecords: "조건에 맞는 기록이 없습니다.",
+  myScore: "내 점수",
 };

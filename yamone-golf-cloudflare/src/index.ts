@@ -145,7 +145,7 @@ async function route(request: Request, env: Env) {
     await env.DB.prepare("SELECT 1 AS ok").first();
     return json({
       status: "ok",
-      version: "0.3.6",
+      version: "0.3.7",
       environment: env.ENVIRONMENT,
       server_time: now(),
     });

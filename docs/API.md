@@ -1,4 +1,4 @@
-# API — v0.3.6
+# API — v0.3.7
 
 모든 응답은 Cache-Control: no-store입니다. 오류는 `{ "error": "code" }` 형식이며 화면 문자열은 앱의 ko/en 리소스에서 정합니다. 각 성공 응답의 profile은 비밀값과 해시를 포함하지 않습니다.
 
@@ -119,7 +119,7 @@ PATCH action:
 - 성공은 `{sheet,replayed}`. 동일 mutation_id와 동일 내용을 재시도하면 실행을 반복하지 않고 최신 sheet와 replayed=true를 반환합니다. 다른 내용 재사용은 `request_reused`입니다. 원래 요청이 성공한 뒤 다른 사람이 수정했어도 재시도가 되덮어쓰지 않습니다.
 - 활성 기기, 참여자, active 라운드, 선택 목록/슬롯/점수 버전을 실제 D1 batch에서 다시 검사합니다. 한 점수라도 검사가 실패하면 변경 이력과 다른 점수까지 모두 롤백합니다.
 - 점수와 다른 참여자의 슬롯 삭제가 경쟁해도 같은 트랜잭션의 삭제/점수 존재 검사가 오래된 쓰기를 막습니다.
-- ended 라운드에는 쓰기를 거절합니다. 종료+24시간 수신자 본인 수정은 8단계 API에서 별도로 추가합니다.
+- ended 라운드에는 쓰기를 거절합니다. 종료+24시간 수신자 본인 수정은 아래 8단계 API에서 별도로 처리합니다.
 - 점수 입력에는 광고 정산을 요구하거나 생성하지 않습니다.
 
 ## 5단계 오프라인 전송
@@ -176,3 +176,35 @@ PATCH action:
 sheet는 전체 플레이어·홀별 점수·코스/PAR을 포함하는 읽기 전용 원본 조회입니다. 비참여 수신자에게 공동 입력 권한을 부여하지 않습니다. current_player는 현재 슬롯의 연결 사용자 일치 여부이고 can_manage는 기존 참여자인지 나타냅니다. peoria_runs는 9단계 전까지 빈 배열입니다.
 
 추가 오류: record_not_found/delivery_not_found(404), delivery_unavailable/already_received/player_link_changed/request_reused/user_changed/ad_required(409), forbidden(403), ads_not_configured(503). 서버 성공 전에는 앱에서 수신 완료로 표시하지 않습니다.
+
+## 8단계 개인 기록·통계·본인 수정
+
+`GET /api/records`에 `q`(골프장명, 최대 100자), `scope=all|statistics|incomplete|nine`을 추가합니다. `before`는 이전과 같은 커서이며 같은 검색/필터와 함께 전달합니다. 응답 항목에 현재 본인 슬롯의 `holes_recorded`, `total_strokes`, `current_player`가 추가됩니다. 통계 필터는 연결된 18홀 완주만, 미완료 필터는 해당 라운드 홀 수보다 입력이 적은 기록을 조회합니다.
+
+`GET /api/statistics`는 현재 사용자에 대해 다음을 반환합니다. `received_rounds`, `eligible_rounds`, `excluded{unlinked,nine_hole,incomplete}`, `average_strokes`, `best_strokes`, `highest_strokes`, `average_to_par`, `distribution{eagle_or_better,birdie,par,bogey,double_or_worse}`, `by_par[{par,holes,average_strokes}]`, `recent[{receipt_id,round_id,course_name,ended_at,total_strokes,total_par}]`(최신 10개). 집계는 한 D1 batch에서 같은 상태를 읽으며 삭제/9홀/미수신/미완료/현재 연결 해제는 통계에 포함하지 않습니다.
+
+`GET /api/records/:id`에 `slot_version`, `edit{allowed,reason,deadline,server_time}`이 추가됩니다. reason은 available/record_deleted/record_unlinked/record_locked입니다. 개인 기록 삭제 시 sheet는 계속 null입니다.
+
+`GET /api/records/:id/scores?user_id=`는 본인 수신 기록의 편집용 `PersonalScoreView`입니다. `receipt_id,round_id,user_id,player_slot_id,slot_version,player_name,hole_count,course,scores,edit`를 반환합니다. scores에는 해당 슬롯만 들어갑니다. 만료/연결 해제면 조회 가능하되 edit.allowed=false이며 삭제한 RECEIPT는 record_deleted를 반환합니다. user_id를 보내면 현재 인증 사용자와 일치해야 합니다.
+
+`PUT /api/records/:id/scores`:
+
+```json
+{
+  "user_id": "UUID",
+  "mutation_id": "UUID",
+  "player_slot_id": "UUID",
+  "slot_version": 1,
+  "hole": 1,
+  "strokes": 4,
+  "version": 1
+}
+```
+
+슬롯은 서버가 해당 RECEIPT의 본인 슬롯과 대조합니다. strokes는 1~999 정수 또는 null입니다. user_id는 필수이며 현재 기기 사용자와 일치해야 합니다. 성공은 `{mutation_id,replayed}`입니다. 성공 뒤 최신 화면은 GET으로 다시 조회합니다. 서버 성공과 화면 갱신 실패를 구분할 수 있도록 쓰기 성공 응답에 별도 조회 결과를 섞지 않습니다.
+
+값이 같으면 점수/이력 버전 변경 없이 요청만 확인합니다. 다른 값이며 버전이 오래됐으면 409 `{error:"score_conflict",current:{slot_id,hole,strokes,version},view}`를 반환합니다. 명시적으로 확인한 최신 version과 새로운 mutation_id로 다시 저장하며 슬롯 버전은 임의로 바꾸지 않습니다.
+
+24시간 기한은 SQL 실행 시 서버 시각으로 재검사합니다. 이미 성공한 요청은 기한/연결/수신 상태가 나중에 달라져도 재확인할 수 있으나 다른 본문은 request_reused입니다. 진행 중 공동 입력 API는 종료 후 계속 거절하며 이 API만 본인 수정 권한을 갖습니다. 원본 SCORE와 감사 이력/record_version은 함께 저장합니다. ended_at/updated_at/round_completions/광고 이력은 변경하지 않습니다.
+
+오류: record_edit_forbidden(403), record_deleted/record_unlinked/record_locked/player_link_changed/score_conflict/user_changed/request_reused/state_changed(409), invalid_score(400). 비소유 RECEIPT는 record_not_found(404)이며 폐기 기기는 401입니다. 상태 경쟁 시 재검사하거나 전체 트랜잭션을 롤백합니다.

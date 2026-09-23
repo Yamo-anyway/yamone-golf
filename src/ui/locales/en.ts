@@ -441,5 +441,59 @@ const en: Record<keyof typeof ko, string> = {
     "The saved receive request could not be read. The original data has been preserved.",
   receipt_pending_missing:
     "No saved receive request. Select a record to receive.",
+  statisticsTitle: "My statistics",
+  statisticsHelp:
+    "Includes received records linked to you with all 18 holes entered. Nine-hole rounds and Peoria scores are excluded.",
+  eligibleRounds: "Eligible rounds",
+  averageScore: "Average score",
+  bestScore: "Best score",
+  highestScore: "Highest score",
+  averageToPar: "Average vs par",
+  noStatistics:
+    "No eligible records yet. Receive a round and check that your 18 holes are complete.",
+  scoreDistribution: "Scores by hole",
+  eagle_or_better: "Eagle or better",
+  birdie: "Birdie",
+  par: "Par",
+  bogey: "Bogey",
+  double_or_worse: "Double bogey or worse",
+  parAverages: "Average strokes by par",
+  excludedRecords: "Excluded records",
+  nineHoleRecords: "Nine-hole rounds",
+  incompleteRecords: "Incomplete rounds",
+  unlinkedRecords: "No longer linked to you",
+  recentStatistics: "Latest 10 eligible rounds",
+  editMyScores: "Edit my scores",
+  personalEditHelp:
+    "Edit only your own scores in this received round. Saving updates the shared record and statistics. Drafts stay on this device and are not sent automatically.",
+  editDeadline: "Edit deadline",
+  record_deleted:
+    "This personal record was deleted. Saved drafts are preserved.",
+  record_unlinked:
+    "This player is no longer linked to you. Editing is unavailable.",
+  record_locked: "Scores are locked 24 hours after the round ended.",
+  record_edit_forbidden: "You can edit only your own player scores.",
+  correction_refresh:
+    "Refresh the record before editing. Saved drafts are preserved.",
+  correction_pending: "Confirm the result of the previous edit request first.",
+  correction_storage_corrupt:
+    "Saved edits could not be read. The original data has been preserved.",
+  discardCorrectionHelp:
+    "Discard this hole’s unsaved edit? The server score stays unchanged.",
+  deleteOwnHoleHelp:
+    "Clear your score for this hole? An incomplete 18-hole record is excluded from statistics.",
+  pendingDeleteOwnHole:
+    "This edit clears the hole. The displayed par is not a saved score.",
+  correctionPendingHelp:
+    "The server result is not confirmed. Retry the same request to check it.",
+  correctionBlockedHelp:
+    "This edit is on hold. Refresh permissions and the deadline. Your input is preserved.",
+  correctionLeaveHelp:
+    "Your edits are saved on this device. Save to the server or keep the drafts when leaving.",
+  resumeCorrection: "Resume score edits",
+  searchMyRecords: "Search my courses",
+  allRecords: "All records",
+  noMatchingRecords: "No records match these filters.",
+  myScore: "My score",
 };
 export default en;

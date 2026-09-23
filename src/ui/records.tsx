@@ -1,10 +1,13 @@
-import React from "react";
+import React, { useRef, useState } from "react";
+import { View } from "react-native";
+import type { RecordFilter } from "../../shared/personal-records";
+import { corrections } from "../data/corrections";
 import { router, useLocalSearchParams } from "expo-router";
 import { records, receiptFlow, receiveAPI } from "../data/records";
 import { players } from "../data/players";
 import type { AdResult } from "../data/golf";
 import type { Delivery } from "../../shared/records";
-import { Button, Card, colors, Txt } from "./components";
+import { Button, Card, colors, Field, Txt } from "./components";
 import { Heading, Problem } from "./courses";
 import { useSession } from "./session";
 import { confirm, useLoad, useTask } from "./golf-hooks";
@@ -41,6 +44,7 @@ export function RecordsHomeEntry() {
   const query = useLoad(async () => ({
     inbox: await records.inbox(),
     pending: await receiptFlow(profile!.user_id).read(),
+    corrections: await corrections(profile!.user_id).summaries(),
   }));
   return (
     <Card>
@@ -65,6 +69,20 @@ export function RecordsHomeEntry() {
         secondary
         onPress={() => router.push("/records")}
       />
+      {query.data?.corrections.map((r) => (
+        <Button
+          key={r.receipt_id}
+          label={t("resumeCorrection") + " · " + r.course_name}
+          secondary
+          testID={"home-correction-" + r.receipt_id}
+          onPress={() =>
+            router.push({
+              pathname: "/record-edit",
+              params: { id: r.receipt_id },
+            })
+          }
+        />
+      ))}
     </Card>
   );
 }
@@ -72,15 +90,28 @@ export function RecordsScreen() {
   const { profile, t, lang } = useSession(),
     task = useTask(),
     makeId = useMutationId();
+  const [search, setSearch] = useState(""),
+    [scope, setScope] = useState<RecordFilter>("all");
+  const applied = useRef<{ q: string; scope: RecordFilter }>({
+    q: "",
+    scope: "all",
+  });
   const query = useLoad(async () => ({
     inbox: await records.inbox(),
-    mine: await records.mine(),
+    mine: await records.mine(undefined, applied.current),
+    filter: { ...applied.current },
     pending: await receiptFlow(profile!.user_id).read(),
   }));
   const data = query.data;
   return (
     <>
       <Heading title={t("recordsTitle")} />
+      <Button
+        label={t("statisticsTitle")}
+        secondary
+        testID="open-statistics"
+        onPress={() => router.push("/statistics")}
+      />
       <Problem text={task.errorText || query.errorText} />
       {data?.pending && (
         <Card>
@@ -153,12 +184,63 @@ export function RecordsScreen() {
       <Txt style={{ fontSize: 22, lineHeight: 30, fontWeight: "700" }}>
         {t("receivedRecords")}
       </Txt>
+      <Field
+        label={t("searchMyRecords")}
+        testID="record-search"
+        value={search}
+        onChangeText={setSearch}
+        maxLength={100}
+      />
+      <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8 }}>
+        {(["all", "statistics", "incomplete", "nine"] as const).map((key) => (
+          <Button
+            key={key}
+            label={t(
+              (
+                {
+                  all: "allRecords",
+                  statistics: "eligibleRounds",
+                  incomplete: "incompleteRecords",
+                  nine: "nineHoleRecords",
+                } as const
+              )[key],
+            )}
+            secondary={scope !== key}
+            disabled={task.busy}
+            testID={"filter-" + key}
+            onPress={() => setScope(key)}
+          />
+        ))}
+      </View>
+      <Button
+        label={t("search")}
+        testID="search-records"
+        disabled={task.busy || !data}
+        onPress={() =>
+          void task.run(async () => {
+            const filter = { q: search.trim(), scope };
+            const mine = await records.mine(undefined, filter);
+            applied.current = filter;
+            query.setData((old) => (old ? { ...old, mine, filter } : old));
+          })
+        }
+      />
       {data && !data.mine.items.length && (
-        <Txt testID="empty-records">{t("noReceivedRecords")}</Txt>
+        <Txt testID="empty-records">
+          {t(
+            data.filter.q || data.filter.scope !== "all"
+              ? "noMatchingRecords"
+              : "noReceivedRecords",
+          )}
+        </Txt>
       )}
       {data?.mine.items.map((r) => (
         <Card key={r.receipt_id}>
           <Txt style={{ fontWeight: "700" }}>{r.course_name}</Txt>
+          <Txt>
+            {t(r.current_player ? "myScore" : "unlinkedRecords")} ·{" "}
+            {r.total_strokes ?? "—"} · {r.holes_recorded}/{r.hole_count}
+          </Txt>
           <Txt>
             {r.hole_count} {t("hole")} ·{" "}
             {new Date(r.ended_at).toLocaleDateString(
@@ -182,7 +264,10 @@ export function RecordsScreen() {
           disabled={task.busy}
           onPress={() =>
             void task.run(async () => {
-              const next = await records.mine(data.mine.next_cursor);
+              const next = await records.mine(
+                data.mine.next_cursor,
+                applied.current,
+              );
               query.setData({
                 ...data,
                 mine: { ...next, items: [...data.mine.items, ...next.items] },
@@ -462,7 +547,7 @@ export function ReceiveRecordScreen() {
 }
 export function RecordScreen() {
   const { id } = useLocalSearchParams<{ id: string }>(),
-    { profile, t } = useSession(),
+    { profile, t, lang } = useSession(),
     task = useTask(),
     makeId = useMutationId();
   const query = useLoad(() => records.detail(id));
@@ -481,6 +566,32 @@ export function RecordScreen() {
           <Txt style={{ color: colors.muted }}>
             {t("receivedWholeRoundHelp")}
           </Txt>
+          <Card>
+            <Txt>
+              {t("editDeadline")} ·{" "}
+              {new Date(data.edit.deadline).toLocaleString(
+                lang === "ko" ? "ko-KR" : "en-US",
+              )}
+            </Txt>
+            {data.edit.allowed ? (
+              <Button
+                label={t("editMyScores")}
+                testID="edit-own-scores"
+                secondary
+                onPress={() =>
+                  router.push({ pathname: "/record-edit", params: { id } })
+                }
+              />
+            ) : (
+              <Txt testID="record-edit-locked">
+                {t(
+                  data.edit.reason === "available"
+                    ? "record_locked"
+                    : data.edit.reason,
+                )}
+              </Txt>
+            )}
+          </Card>
           <ScorecardContent sheet={data.sheet} />
           {data.can_manage && (
             <Button

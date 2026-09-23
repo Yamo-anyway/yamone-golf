@@ -1,20 +1,15 @@
-import { spawn } from "node:child_process";
+import { spawn, type ChildProcess } from "node:child_process";
 import { setTimeout } from "node:timers/promises";
+async function stop(child: ChildProcess) {
+  if (child.exitCode !== null || child.signalCode !== null) return;
+  await new Promise<void>((resolve) => {
+    child.once("exit", () => resolve());
+    child.kill("SIGTERM");
+  });
+}
 async function main() {
   const apiPort = "8791",
     previewPort = "4181";
-  const api = spawn(
-    process.execPath,
-    ["--import", "tsx", "scripts/local-api.ts"],
-    {
-      stdio: "inherit",
-      env: {
-        ...process.env,
-        UI_API_PORT: apiPort,
-        UI_PREVIEW_PORT: previewPort,
-      },
-    },
-  );
   const preview = spawn(
     process.execPath,
     ["--import", "tsx", "scripts/preview.ts"],
@@ -28,21 +23,6 @@ async function main() {
     },
   );
   try {
-    let ready = false;
-    for (let attempt = 0; attempt < 100; attempt++) {
-      if (api.exitCode !== null || preview.exitCode !== null)
-        throw new Error("Test server exited");
-      try {
-        if ((await fetch(`http://localhost:${previewPort}/health`)).ok) {
-          ready = true;
-          break;
-        }
-      } catch {
-        /* starting */
-      }
-      await setTimeout(200);
-    }
-    if (!ready) throw new Error("Test server startup timed out");
     const requested = process.argv.slice(2);
     for (const file of requested.length
       ? requested
@@ -54,23 +34,55 @@ async function main() {
           "tests/offline-ui.ts",
           "tests/ending-ui.ts",
           "tests/records-ui.ts",
+          "tests/personal-ui.ts",
         ]) {
-      const code = await new Promise<number | null>((resolve, reject) => {
-        const test = spawn(process.execPath, ["--import", "tsx", file], {
+      // Each suite owns its D1 and rate-limit buckets. Production limits stay intact.
+      const api = spawn(
+        process.execPath,
+        ["--import", "tsx", "scripts/local-api.ts"],
+        {
           stdio: "inherit",
           env: {
             ...process.env,
-            PREVIEW_URL: `http://localhost:${previewPort}`,
+            UI_API_PORT: apiPort,
+            UI_PREVIEW_PORT: previewPort,
           },
+        },
+      );
+      try {
+        let ready = false;
+        for (let attempt = 0; attempt < 100; attempt++) {
+          if (api.exitCode !== null || preview.exitCode !== null)
+            throw Error("Test server exited");
+          try {
+            if ((await fetch(`http://localhost:${previewPort}/health`)).ok) {
+              ready = true;
+              break;
+            }
+          } catch {
+            /* starting */
+          }
+          await setTimeout(200);
+        }
+        if (!ready) throw Error("Test server startup timed out");
+        const code = await new Promise<number | null>((resolve, reject) => {
+          const test = spawn(process.execPath, ["--import", "tsx", file], {
+            stdio: "inherit",
+            env: {
+              ...process.env,
+              PREVIEW_URL: `http://localhost:${previewPort}`,
+            },
+          });
+          test.on("error", reject);
+          test.on("exit", resolve);
         });
-        test.on("error", reject);
-        test.on("exit", resolve);
-      });
-      if (code !== 0) throw new Error(`UI test exited ${code}`);
+        if (code !== 0) throw Error(`UI test exited ${code}: ${file}`);
+      } finally {
+        await stop(api);
+      }
     }
   } finally {
-    api.kill("SIGTERM");
-    preview.kill("SIGTERM");
+    await stop(preview);
   }
 }
 void main().catch((error) => {

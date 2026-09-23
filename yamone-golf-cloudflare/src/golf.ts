@@ -9,6 +9,7 @@ import {
   type Round,
   type Check,
 } from "./round-store";
+import { personalRecordsRoute } from "./personal-records";
 import { recordsRoute } from "./records";
 import { lifecycleRoute } from "./round-lifecycle";
 import { scoresRoute } from "./scores";
@@ -311,6 +312,8 @@ export async function golfRoute(request: Request, env: Env): Promise<Response> {
   const d = await authenticate(request, env);
   if (method !== "GET")
     await limit(request, env, `golf:${d.user_id}`, 120, 60_000);
+  const personal = await personalRecordsRoute(request, env, d);
+  if (personal) return personal;
   const records = await recordsRoute(request, env, d);
   if (records) return records;
   const lifecycle = await lifecycleRoute(request, env, d);

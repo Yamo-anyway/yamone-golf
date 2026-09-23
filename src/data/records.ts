@@ -10,6 +10,7 @@ import type {
   RecordDetail,
   Receipt,
 } from "../../shared/records";
+import type { RecordFilter } from "../../shared/personal-records";
 const before = (cursor?: string | null) =>
   cursor ? "?before=" + encodeURIComponent(cursor) : "";
 export const receiveAPI: ReceiptAPI = {
@@ -27,8 +28,17 @@ export const receiveAPI: ReceiptAPI = {
 export const records = {
   inbox: (cursor?: string | null) =>
     request<Page<Delivery>>("/api/record-inbox" + before(cursor)),
-  mine: (cursor?: string | null) =>
-    request<Page<ReceiptItem>>("/api/records" + before(cursor)),
+  mine: (
+    cursor?: string | null,
+    filter: { q: string; scope: RecordFilter } = { q: "", scope: "all" },
+  ) =>
+    request<Page<ReceiptItem>>(
+      "/api/records?q=" +
+        encodeURIComponent(filter.q) +
+        "&scope=" +
+        filter.scope +
+        (cursor ? "&before=" + encodeURIComponent(cursor) : ""),
+    ),
   detail: (id: string) => request<RecordDetail>("/api/records/" + id),
   deliveries: (round: string, cursor?: string | null) =>
     request<Page<Delivery>>(

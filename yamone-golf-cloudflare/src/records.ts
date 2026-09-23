@@ -22,6 +22,7 @@ import type {
   ReceiveAction,
   RecordDetail,
 } from "../../shared/records";
+import { editAccess } from "../../shared/personal-records";
 const deliverySQL = `SELECT d.*,su.nickname sender_name,ru.nickname recipient_name,
  COALESCE(pu.nickname,p.name) player_name,json_extract(r.course_snapshot,'$.name') course_name,
  r.hole_count,r.ended_at,r.creator_id,p.user_id linked_user_id,p.deleted_at slot_deleted,r.status round_status
@@ -275,7 +276,7 @@ async function execute(env: Env, d: Device, a: Action) {
   }
   return json({ receipt: await receipt(env, d, id) }, 201);
 }
-async function recordDetail(
+export async function recordDetail(
   env: Env,
   d: Device,
   id: string,
@@ -287,7 +288,8 @@ async function recordDetail(
       env,
       `SELECT q.*,r.course_snapshot,r.hole_count,r.ended_at,r.roster_version,
     EXISTS(SELECT 1 FROM round_participants p WHERE p.round_id=q.round_id AND p.user_id=q.user_id) can_manage,
-    EXISTS(SELECT 1 FROM player_slots p WHERE p.slot_id=q.player_slot_id AND p.user_id=q.user_id AND p.deleted_at IS NULL) current_player
+    EXISTS(SELECT 1 FROM player_slots p WHERE p.slot_id=q.player_slot_id AND p.user_id=q.user_id AND p.deleted_at IS NULL) current_player,
+    (SELECT version FROM player_slots p WHERE p.slot_id=q.player_slot_id) slot_version
     FROM receipts q JOIN rounds r ON r.round_id=q.round_id WHERE q.receipt_id=? AND q.user_id=?`,
       id,
       d.user_id,
@@ -316,6 +318,7 @@ async function recordDetail(
     roster_version,
     can_manage,
     current_player,
+    slot_version,
     ...r
   } = row;
   return {
@@ -323,6 +326,13 @@ async function recordDetail(
     ended_at,
     can_manage: !!can_manage,
     current_player: !!current_player,
+    slot_version,
+    edit: editAccess(
+      ended_at,
+      r.status === "received",
+      !!current_player,
+      now(),
+    ),
     peoria_runs: [],
     sheet:
       r.status === "received"
@@ -363,16 +373,6 @@ export async function recordsRoute(
         (v) => v.created_at + ":" + v.delivery_id,
       ),
     );
-  }
-  if (path === "/api/records" && method === "GET") {
-    const c = cursor(url);
-    const rows = await stmt(
-      env,
-      `SELECT q.*,json_extract(r.course_snapshot,'$.name') course_name,r.hole_count,r.ended_at,COALESCE(u.nickname,p.name) player_name FROM receipts q JOIN rounds r ON r.round_id=q.round_id JOIN player_slots p ON p.slot_id=q.player_slot_id LEFT JOIN users u ON u.user_id=p.user_id WHERE q.user_id=? AND q.status='received'${c ? " AND (q.received_at<? OR (q.received_at=? AND q.receipt_id<?))" : ""} ORDER BY q.received_at DESC,q.receipt_id DESC LIMIT 21`,
-      d.user_id,
-      ...(c ? [c.at, c.at, c.id] : []),
-    ).all<any>();
-    return json(page(rows.results, (v) => v.received_at + ":" + v.receipt_id));
   }
   const rm = path.match(/^\/api\/records\/([^/]+)$/);
   if (rm) {

@@ -1,4 +1,5 @@
 import type { ScoreSheet } from "./scores";
+import type { EditAccess } from "./personal-records";
 export type Delivery = {
   delivery_id: string;
   round_id: string;
@@ -31,6 +32,9 @@ export type ReceiptItem = Receipt & {
   hole_count: number;
   ended_at: number;
   player_name: string;
+  holes_recorded: number;
+  total_strokes: number | null;
+  current_player: number;
 };
 export type Page<T> = { items: T[]; next_cursor: string | null };
 export type ReceiveAction = {
@@ -47,6 +51,8 @@ export type RecordDetail = {
   ended_at: number;
   can_manage: boolean;
   current_player: boolean;
+  slot_version: number;
+  edit: EditAccess;
   // Populated by the Peoria stage; a receipt grants access to the whole round.
   peoria_runs: unknown[];
 };

@@ -29,7 +29,7 @@ async function view(env: Env, d: Device, id: string): Promise<EndView> {
     ),
     stmt(
       env,
-      `SELECT p.slot_id,p.name,SUM(s.strokes) AS total_strokes,COALESCE(c.holes_recorded,COUNT(s.strokes)) AS holes_recorded FROM player_slots p JOIN rounds r ON r.round_id=p.round_id LEFT JOIN round_completions c ON c.round_id=p.round_id AND c.slot_id=p.slot_id LEFT JOIN scores s ON s.round_id=p.round_id AND s.slot_id=p.slot_id AND s.hole<=r.hole_count WHERE p.round_id=? AND p.deleted_at IS NULL GROUP BY p.slot_id ORDER BY p.position`,
+      `SELECT p.slot_id,p.name,SUM(s.strokes) AS total_strokes,COUNT(s.strokes) AS holes_recorded FROM player_slots p JOIN rounds r ON r.round_id=p.round_id LEFT JOIN scores s ON s.round_id=p.round_id AND s.slot_id=p.slot_id AND s.hole<=r.hole_count WHERE p.round_id=? AND p.deleted_at IS NULL GROUP BY p.slot_id ORDER BY p.position`,
       id,
     ),
     stmt(

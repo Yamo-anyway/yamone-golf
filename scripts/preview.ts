@@ -29,7 +29,7 @@ createServer(async (req, res) => {
         const value = req.headers[name];
         if (typeof value === "string") headers.set(name, value);
       }
-      const upstream = await fetch(backend + url.pathname, {
+      const upstream = await fetch(backend + url.pathname + url.search, {
         method: req.method,
         headers,
         body: chunks.length ? Buffer.concat(chunks) : undefined,
