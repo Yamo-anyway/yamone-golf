@@ -201,7 +201,8 @@ export default {
     "닉네임과 개인 코드를 확인하세요. 연결만으로 기록 참여자가 추가되거나 광고가 나오지는 않아요.",
   unlinkHelp:
     "사용자 연결만 해제합니다. 플레이어 자리와 기존 스코어는 그대로 유지됩니다.",
-  unlinkConfirm: "이 사용자와의 연결을 해제할까요? 스코어는 유지됩니다.",
+  unlinkConfirm:
+    "사용자 연결을 해제할까요? 슬롯과 점수는 유지됩니다. 대기 전송은 취소되며 이미 받은 개인 기록은 지워지지 않습니다.",
   savePlayer: "플레이어 저장",
   addPlayerName: "추가할 플레이어 이름",
   deleteImpact: "삭제 영향 확인",
@@ -216,7 +217,7 @@ export default {
   confirmDeletePlayer: "확인 후 삭제",
   lastPlayerHelp: "라운드에는 실제 플레이어가 최소 한 명 필요합니다.",
   playersReadOnly:
-    "종료된 라운드에서는 미등록 플레이어의 이름만 변경할 수 있어요.",
+    "종료 후에는 임시 이름과 사용자 연결을 관리할 수 있습니다. 플레이어 추가·삭제와 점수 입력은 잠겨 있습니다.",
   playerDraftChanged:
     "다른 참여자가 정보를 변경했습니다. 작성 내용은 남겨 두었어요. 최신 내용을 확인한 뒤 다시 수정해 주세요.",
   targetDraftChanged:
@@ -384,4 +385,59 @@ export default {
   endNoExtraAd: "이 라운드의 광고 처리가 끝나 추가 광고 없이 종료됩니다.",
   roundActivityHelp:
     "마지막 기록 변경 후 6시간이 지나면 서버에서 자동 종료합니다.",
+  recordsTitle: "골프 기록",
+  recordsToReceive: "받을 기록",
+  receivedRecords: "받은 기록",
+  receivedRecord: "받은 라운드 기록",
+  openRecords: "골프 기록 보기",
+  openReceivedRecord: "라운드 전체 보기",
+  noRecordsToReceive: "받을 기록이 없습니다.",
+  noReceivedRecords: "아직 받은 기록이 없습니다.",
+  receiveRecord: "기록 받기",
+  receiveMyRecord: "내 기록으로 받기",
+  confirmReceive: "내 기록에 등록",
+  roundRecords: "기록 보내기 · 받기",
+  sendRecord: "기록 보내기",
+  sendRecordAgain: "기록 다시 보내기",
+  deliveryHistory: "보내기 이력",
+  sentBy: "보낸 사람",
+  deliveryPending: "전송 대기",
+  deliveryReceived: "수신 완료",
+  deliveryCancelled: "취소됨",
+  moreRecords: "더 보기",
+  declineRecord: "받지 않기",
+  declineRecordHelp:
+    "이 전송을 취소할까요? 라운드 원본은 유지됩니다. 새로 보낸 기록은 다시 받을 수 있습니다.",
+  cancelDelivery: "전송 취소",
+  cancelDeliveryHelp: "상대방이 아직 받지 않은 전송을 취소할까요?",
+  deliveryHelp:
+    "플레이어를 개인 코드·QR로 연결한 뒤 기록을 보내세요. 받기를 완료하면 라운드 전체가 그 사용자의 개인 기록에 등록됩니다.",
+  receiveWholeRound:
+    "골프장, 코스, 모든 플레이어의 홀별 점수와 순위를 내 기록에서 볼 수 있습니다.",
+  receivedWholeRoundHelp:
+    "받은 라운드의 전체 기록입니다. 다른 플레이어의 점수도 함께 볼 수 있습니다.",
+  receiveAdSettled:
+    "이 라운드의 광고 처리가 끝났습니다. 추가 광고 없이 이어서 받을 수 있습니다.",
+  resumeReceipt: "기록 받기 이어서 처리",
+  receiptPendingHelp:
+    "처리 중이던 기록 받기가 있습니다. 이어서 결과를 확인해 주세요.",
+  backToRecords: "기록 목록으로",
+  cancelReceiveHelp:
+    "이 화면의 처리를 멈추고 목록으로 돌아갈까요? 이미 처리된 광고와 수신 결과는 유지됩니다.",
+  deletePersonalRecord: "내 기록에서 삭제",
+  deleteRecordHelp:
+    "내 개인 기록에서 삭제할까요? 공동 라운드 원본과 다른 사람의 기록은 유지됩니다. 과거 전송은 다시 나타나지 않으며, 새로운 보내기가 있어야 다시 받을 수 있습니다.",
+  recordDeleted:
+    "내 기록에서 삭제된 항목입니다. 이전 수신 요청을 다시 확인해도 복원되지 않습니다.",
+  round_not_ended: "라운드 종료 후 기록을 보낼 수 있습니다.",
+  delivery_not_found: "해당 전송을 찾을 수 없습니다.",
+  delivery_unavailable:
+    "취소되었거나 플레이어 연결이 바뀌어 받을 수 없습니다. 목록을 새로 확인해 주세요.",
+  delivery_received: "이미 받은 기록이므로 전송을 취소할 수 없습니다.",
+  already_received: "이미 개인 기록에 등록된 라운드입니다.",
+  record_not_found: "내 기록에서 해당 항목을 찾을 수 없습니다.",
+  receipt_pending_corrupt:
+    "보관한 수신 요청을 읽을 수 없습니다. 원래 데이터를 유지했습니다.",
+  receipt_pending_missing:
+    "이어서 처리할 수신 요청이 없습니다. 받을 기록을 다시 선택해 주세요.",
 };

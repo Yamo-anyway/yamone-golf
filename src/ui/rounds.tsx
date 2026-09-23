@@ -11,6 +11,7 @@ import {
   type JoinInput,
   type PendingRound,
 } from "../data/golf";
+import { RecordsHomeEntry } from "./records";
 import { EndedRoundSummary } from "./round-ending";
 import { useOfflineScores } from "./offline-scores";
 import { useSession } from "./session";
@@ -179,6 +180,7 @@ export function HomeRounds() {
           />
         </Card>
       ))}
+      <RecordsHomeEntry />
       {!!home?.ended_rounds?.length && (
         <Txt style={{ fontWeight: "700" }}>{t("recentEndedRounds")}</Txt>
       )}
@@ -604,7 +606,18 @@ export function RoundScreen() {
               </Txt>
             ))}
           </Card>
-          {detail.round.status === "ended" && <EndedRoundSummary id={id} />}
+          {detail.round.status === "ended" && (
+            <>
+              <EndedRoundSummary id={id} />
+              <Button
+                label={t("roundRecords")}
+                testID="round-records"
+                onPress={() =>
+                  router.push({ pathname: "/round-records", params: { id } })
+                }
+              />
+            </>
+          )}
           {detail.round.status === "active" && (
             <Button
               label={t("scoreEntry")}

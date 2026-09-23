@@ -2,7 +2,12 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { Modal, Pressable, ScrollView, View } from "react-native";
 import { router, useLocalSearchParams, useFocusEffect } from "expo-router";
 import { useNavigation, usePreventRemove } from "expo-router/react-navigation";
-import { scoreAt, ranking, symbolFor } from "../../shared/scores";
+import {
+  scoreAt,
+  ranking,
+  symbolFor,
+  type ScoreSheet,
+} from "../../shared/scores";
 import { Button, Card, Txt, colors } from "./components";
 import { Heading, Problem } from "./courses";
 import { useTask } from "./golf-hooks";
@@ -758,148 +763,16 @@ export function ScorecardScreen() {
       void reload();
     }, [reload]),
   );
-  const [hole, setHole] = useState<number | null>(null);
   return (
     <>
       <Heading title={t("scorecard")} />
       <Problem text={storeError} />
       {sheet && (
         <>
-          <Txt>{sheet.course.name}</Txt>
           <Txt style={{ fontSize: 12, color: colors.muted }}>
             {t("cachedScorecardHelp")}
           </Txt>
-          {sheet.course.segments.map((segment, half) => (
-            <View
-              key={half}
-              testID={"card-half-" + half}
-              style={{
-                gap: 10,
-                paddingVertical: 16,
-                borderTopWidth: 1,
-                borderColor: colors.line,
-              }}
-            >
-              <Txt style={{ fontWeight: "800" }}>
-                {t(half === 0 ? "frontNine" : "backNine")} · {segment.name}
-              </Txt>
-              <View style={{ flexDirection: "row" }}>
-                {segment.pars.map((par, i) => (
-                  <View key={i} style={{ flex: 1, alignItems: "center" }}>
-                    <Txt style={{ fontSize: 11, lineHeight: 18 }}>
-                      {half * 9 + i + 1}
-                    </Txt>
-                    <Txt
-                      style={{
-                        fontSize: 10,
-                        lineHeight: 16,
-                        color: colors.muted,
-                      }}
-                    >
-                      P{par}
-                    </Txt>
-                  </View>
-                ))}
-                <View style={{ width: 34, alignItems: "center" }}>
-                  <Txt style={{ fontSize: 10, lineHeight: 18 }}>
-                    {t("total")}
-                  </Txt>
-                  <Txt style={{ fontSize: 10, lineHeight: 16 }}>
-                    {segment.pars.reduce((a, b) => a + b, 0)}
-                  </Txt>
-                </View>
-              </View>
-              {ranking(sheet).map((p) => {
-                const values = segment.pars.map(
-                    (_, i) =>
-                      scoreAt(sheet, p.slot_id, half * 9 + i + 1).strokes,
-                  ),
-                  count = values.filter((v) => v !== null).length;
-                return (
-                  <View key={p.slot_id} style={{ gap: 4 }}>
-                    <Txt style={{ fontSize: 14, fontWeight: "600" }}>
-                      {p.rank ?? "—"}. {p.name}{" "}
-                      <Txt style={{ fontSize: 12, color: colors.muted }}>
-                        ({count}/9)
-                      </Txt>
-                    </Txt>
-                    <View style={{ flexDirection: "row" }}>
-                      {values.map((v, i) => (
-                        <View key={i} style={{ flex: 1, alignItems: "center" }}>
-                          <ScoreMark strokes={v} par={segment.pars[i]} />
-                        </View>
-                      ))}
-                      <View
-                        style={{
-                          width: 34,
-                          alignItems: "center",
-                          justifyContent: "center",
-                        }}
-                      >
-                        <Txt style={{ fontSize: 12, fontWeight: "800" }}>
-                          {count
-                            ? values.reduce<number>((s, v) => s + (v ?? 0), 0)
-                            : "—"}
-                        </Txt>
-                      </View>
-                    </View>
-                  </View>
-                );
-              })}
-            </View>
-          ))}
-          <Txt style={{ color: colors.muted, fontSize: 13 }}>
-            {t("scoreLegend")}
-          </Txt>
-          <Card>
-            <Txt style={{ fontWeight: "800" }}>
-              {t(hole === null ? "cumulativeRank" : "holeRank")}
-              {hole === null ? "" : " · " + hole}
-            </Txt>
-            <Txt style={{ fontSize: 13, color: colors.muted }}>
-              {t("rankHelp")}
-            </Txt>
-            <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 4 }}>
-              <Pressable
-                accessibilityRole="button"
-                onPress={() => setHole(null)}
-                style={{
-                  padding: 10,
-                  backgroundColor: hole === null ? colors.mint : undefined,
-                }}
-              >
-                <Txt>{t("total")}</Txt>
-              </Pressable>
-              {Array.from({ length: sheet.hole_count }, (_, i) => i + 1).map(
-                (h) => (
-                  <Pressable
-                    key={h}
-                    accessibilityRole="button"
-                    onPress={() => setHole(h)}
-                    style={{
-                      minWidth: 44,
-                      minHeight: 44,
-                      alignItems: "center",
-                      justifyContent: "center",
-                      backgroundColor: hole === h ? colors.mint : undefined,
-                    }}
-                  >
-                    <Txt>{h}</Txt>
-                  </Pressable>
-                ),
-              )}
-            </View>
-            {ranking(sheet, hole ?? undefined).map((p) => (
-              <View key={p.slot_id} style={{ flexDirection: "row", gap: 8 }}>
-                <Txt style={{ width: 24 }}>{p.rank ?? "—"}</Txt>
-                <Txt style={{ flex: 1 }}>{p.name}</Txt>
-                <Txt>
-                  {p.total ?? "—"} · {p.count}/
-                  {hole === null ? sheet.hole_count : 1}
-                </Txt>
-              </View>
-            ))}
-          </Card>
+          <ScorecardContent sheet={sheet} />
         </>
       )}
       <Button
@@ -908,6 +781,143 @@ export function ScorecardScreen() {
         secondary
         onPress={() => void reload()}
       />
+    </>
+  );
+}
+
+export function ScorecardContent({ sheet }: { sheet: ScoreSheet }) {
+  const { t } = useSession();
+  const [hole, setHole] = useState<number | null>(null);
+  return (
+    <>
+      <Txt>{sheet.course.name}</Txt>
+
+      {sheet.course.segments.map((segment, half) => (
+        <View
+          key={half}
+          testID={"card-half-" + half}
+          style={{
+            gap: 10,
+            paddingVertical: 16,
+            borderTopWidth: 1,
+            borderColor: colors.line,
+          }}
+        >
+          <Txt style={{ fontWeight: "800" }}>
+            {t(half === 0 ? "frontNine" : "backNine")} · {segment.name}
+          </Txt>
+          <View style={{ flexDirection: "row" }}>
+            {segment.pars.map((par, i) => (
+              <View key={i} style={{ flex: 1, alignItems: "center" }}>
+                <Txt style={{ fontSize: 11, lineHeight: 18 }}>
+                  {half * 9 + i + 1}
+                </Txt>
+                <Txt
+                  style={{
+                    fontSize: 10,
+                    lineHeight: 16,
+                    color: colors.muted,
+                  }}
+                >
+                  P{par}
+                </Txt>
+              </View>
+            ))}
+            <View style={{ width: 34, alignItems: "center" }}>
+              <Txt style={{ fontSize: 10, lineHeight: 18 }}>{t("total")}</Txt>
+              <Txt style={{ fontSize: 10, lineHeight: 16 }}>
+                {segment.pars.reduce((a, b) => a + b, 0)}
+              </Txt>
+            </View>
+          </View>
+          {ranking(sheet).map((p) => {
+            const values = segment.pars.map(
+                (_, i) => scoreAt(sheet, p.slot_id, half * 9 + i + 1).strokes,
+              ),
+              count = values.filter((v) => v !== null).length;
+            return (
+              <View key={p.slot_id} style={{ gap: 4 }}>
+                <Txt style={{ fontSize: 14, fontWeight: "600" }}>
+                  {p.rank ?? "—"}. {p.name}{" "}
+                  <Txt style={{ fontSize: 12, color: colors.muted }}>
+                    ({count}/9)
+                  </Txt>
+                </Txt>
+                <View style={{ flexDirection: "row" }}>
+                  {values.map((v, i) => (
+                    <View key={i} style={{ flex: 1, alignItems: "center" }}>
+                      <ScoreMark strokes={v} par={segment.pars[i]} />
+                    </View>
+                  ))}
+                  <View
+                    style={{
+                      width: 34,
+                      alignItems: "center",
+                      justifyContent: "center",
+                    }}
+                  >
+                    <Txt style={{ fontSize: 12, fontWeight: "800" }}>
+                      {count
+                        ? values.reduce<number>((s, v) => s + (v ?? 0), 0)
+                        : "—"}
+                    </Txt>
+                  </View>
+                </View>
+              </View>
+            );
+          })}
+        </View>
+      ))}
+      <Txt style={{ color: colors.muted, fontSize: 13 }}>
+        {t("scoreLegend")}
+      </Txt>
+      <Card>
+        <Txt style={{ fontWeight: "800" }}>
+          {t(hole === null ? "cumulativeRank" : "holeRank")}
+          {hole === null ? "" : " · " + hole}
+        </Txt>
+        <Txt style={{ fontSize: 13, color: colors.muted }}>{t("rankHelp")}</Txt>
+        <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 4 }}>
+          <Pressable
+            accessibilityRole="button"
+            onPress={() => setHole(null)}
+            style={{
+              padding: 10,
+              backgroundColor: hole === null ? colors.mint : undefined,
+            }}
+          >
+            <Txt>{t("total")}</Txt>
+          </Pressable>
+          {Array.from({ length: sheet.hole_count }, (_, i) => i + 1).map(
+            (h) => (
+              <Pressable
+                key={h}
+                accessibilityRole="button"
+                onPress={() => setHole(h)}
+                style={{
+                  minWidth: 44,
+                  minHeight: 44,
+                  alignItems: "center",
+                  justifyContent: "center",
+                  backgroundColor: hole === h ? colors.mint : undefined,
+                }}
+              >
+                <Txt>{h}</Txt>
+              </Pressable>
+            ),
+          )}
+        </View>
+        {ranking(sheet, hole ?? undefined).map((p) => (
+          <View key={p.slot_id} style={{ flexDirection: "row", gap: 8 }}>
+            <Txt style={{ width: 24 }}>{p.rank ?? "—"}</Txt>
+            <Txt style={{ flex: 1 }}>{p.name}</Txt>
+            <Txt>
+              {p.total ?? "—"} · {p.count}/
+              {hole === null ? sheet.hole_count : 1}
+            </Txt>
+          </View>
+        ))}
+      </Card>
     </>
   );
 }

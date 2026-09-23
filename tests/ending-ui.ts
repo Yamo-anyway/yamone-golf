@@ -231,6 +231,11 @@ async function main() {
     // Other participant's later local draft is retained when the server has ended.
     await b.page.goto(scoreURL);
     await b.page.getByTestId("current-hole").waitFor();
+    // The saved active cache renders first; wait for the server's ended state.
+    await b.page
+      .getByTestId("scores-end-round")
+      .filter({ hasText: "종료된 라운드" })
+      .waitFor();
     assert.equal(await b.page.getByTestId("save-hole").count(), 0);
     // Small English completion view.
     await call(b.page, "/api/me", { language: "en" }, "PATCH");

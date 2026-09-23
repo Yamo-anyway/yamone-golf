@@ -10,6 +10,8 @@ export type Player = {
   score_count: number;
   delivery_count: number;
   receipt_count: number;
+  received_current: number;
+  pending_delivery_id: string | null;
 };
 export type Roster = {
   status: "active" | "ended";

@@ -1,4 +1,4 @@
-# API — v0.3.5
+# API — v0.3.6
 
 모든 응답은 Cache-Control: no-store입니다. 오류는 `{ "error": "code" }` 형식이며 화면 문자열은 앱의 ko/en 리소스에서 정합니다. 각 성공 응답의 profile은 비밀값과 해시를 포함하지 않습니다.
 
@@ -54,7 +54,7 @@
 
 추가 오류: course_changed/list_changed/state_changed/active_round_exists/round_ended/invitation_unavailable/ad_required(409), forbidden(403), ads_not_configured(503). 오류 후 화면 초안을 임의로 지우지 않습니다.
 
-점수·종료·기록 보내기/받기·이메일 API는 후속 단계입니다.
+점수·종료·기록 보내기/받기 API는 아래에 이어집니다. 이메일 API는 후속 단계입니다.
 
 ## 3단계 플레이어·개인 입력 대상 API
 
@@ -77,7 +77,7 @@ PATCH action:
 - link: code, confirmed_user_id. 미리 확인한 사용자를 명시합니다. 같은 라운드에서 하나의 user_id는 한 슬롯에만 연결됩니다.
 - unlink: name. 임시 이름을 지정하고 user_id만 연결 해제합니다. 슬롯 ID·스코어·이전 전송/수신 참조는 지우지 않습니다.
 
-추가·연결·해제·삭제·입력 대상 변경은 진행 중 라운드에서만 허용합니다. 종료 후 기록 받기와 함께 하는 플레이어 연결은 별도 후속 API입니다. 연결은 round_participants 또는 active_round_users를 추가하지 않고 광고도 요청하지 않습니다.
+추가·삭제·입력 대상 변경은 진행 중 라운드에서만 허용합니다. 7단계부터 종료 후에도 기존 참여자는 연결·해제·미등록 이름 수정을 할 수 있습니다. 연결 해제는 대기 중 전송을 함께 취소하며 이미 받은 개인 기록은 유지합니다. 연결은 round_participants 또는 active_round_users를 추가하지 않고 광고도 요청하지 않습니다. 플레이어 응답에는 현재 연결 사용자의 received_current, pending_delivery_id도 포함합니다.
 
 삭제는 다음을 원자적으로 다시 확인합니다: 기기 활성, 참여 권한, 진행 상태, 슬롯 버전, 전체 플레이어 목록 버전, 사용자 미연결, 실제 스코어 없음, 모든 전송/수신 참조 없음, 영향받는 저장 목록 수, 최소 플레이어 1명 유지. 수신 후 개인 기록을 지운 흔적이나 취소된 전송이 있어도 단순 삭제하지 않습니다. 강제 삭제 API는 제공하지 않습니다.
 
@@ -91,7 +91,7 @@ PATCH action:
 
 ## 후속 점수·기록 API 통합 시 제약
 
-0003 마이그레이션의 scores는 아래 4단계 API가 사용합니다. deliveries/receipts는 삭제 보호용 참조 구조만 있으며 보내기/받기 API는 7단계에서 연결합니다.
+0003 마이그레이션의 scores는 아래 4단계 API가 사용합니다. deliveries/receipts는 0006 마이그레이션과 아래 7단계 API로 연결합니다.
 
 4단계의 점수 저장은 동일 트랜잭션에서 deleted_at IS NULL, 활성 기기, 참여/입력 권한, 라운드 상태와 홀 범위를 확인해야 합니다. 삭제된 슬롯에 뒤늦게 도착한 입력을 복원해서는 안 됩니다. 점수 없음은 strokes=NULL 또는 행 부재이며 0은 저장할 수 없습니다. 7단계의 전송·수신도 수신 사용자·라운드·슬롯 관계를 함께 검증해야 합니다.
 
@@ -139,8 +139,40 @@ PATCH action:
 - `GET /api/rounds/:id/ending`: 서버 종료 여부/시각/사유, record_version, permission_version, 내 can_end/is_creator, 참가자별 종료 권한·개인 코드, 각 플레이어의 입력 홀 수/합계/완료 여부.
 - `POST /api/rounds/:id/ending`: `{user_id, mutation_id, record_version}`. 최신 버전과 권한을 검사하여 종료. 응답은 GET과 같은 종료 상태. 바뀐 기록은 `end_changed`(409), 위임 없는 사용자는 `end_forbidden`(403).
 - `POST /api/rounds/:id/end-permissions`: `{user_id,mutation_id,permission_version,participant_id,can_end:boolean}`. 생성자만 사용. 다른 버전은 `permissions_changed`(409). 비참여자/자기 자신 대상은 `invalid_participant`.
-- `GET /api/home`에 `ended_rounds`가 추가됩니다. 해당 사용자가 참여한 최근 종료 10개이며 개인 수신 기록이 아닙니다.
+- `GET /api/home`에 `ended_rounds`가 추가됩니다. 해당 사용자가 참여한 최근 종료 10개이며 개인 수신 기록이 아닙니다. 7단계부터 수신 이력이 있는 라운드는 개인 기록을 삭제했더라도 이 목록에 다시 표시하지 않습니다.
 
 새 요청의 user_id가 인증 사용자와 다르면 user_changed(409). 같은 요청 ID와 같은 내용은 재조회로 처리하고, 다른 내용은 request_reused(409). 이미 종료된 라운드의 종료 재요청은 현재 종료 상태를 반환하며 새 활동이나 광고 이력을 만들지 않습니다.
 
 마이그레이션 0005를 적용해야 합니다. 6시간 만료는 scheduled와 API 양쪽에서 처리하고 실제 쓰기 조건에도 기한을 검사합니다. 결과 미확정 오프라인 요청은 이전과 같이 같은 ID로 재시도할 수 있지만, 새로운 종료 후 점수 쓰기는 거절합니다.
+
+## 7단계 기록 전달 API
+
+0006 마이그레이션을 적용합니다. 모든 쓰기에는 인증 사용자와 일치하는 `user_id`가 필수입니다. `mutation_id`는 같은 작업의 재시도에 유지하며 다른 본문으로 재사용할 수 없습니다. 수신 흐름의 `action_id`도 원래 `delivery_id`에 고정됩니다.
+
+| 메서드 | 경로                               | 입력 / 결과                                                                        |
+| ------ | ---------------------------------- | ---------------------------------------------------------------------------------- |
+| GET    | /api/record-inbox?before=          | 본인에게 온 유효한 pending 전송                                                    |
+| GET    | /api/records?before=               | 본인의 received 개인 기록                                                          |
+| GET    | /api/records/:receipt_id           | 본인 RECEIPT, 전체 라운드 sheet, ended_at, can_manage, current_player, peoria_runs |
+| DELETE | /api/records/:receipt_id           | user_id, mutation_id → 개인 RECEIPT만 deleted 처리                                 |
+| GET    | /api/rounds/:id/deliveries?before= | 종료 라운드의 기존 참여자에게 전송 이력                                            |
+| POST   | /api/rounds/:id/deliveries         | user_id, mutation_id, slot_id, version, recipient_id → 전송                        |
+| POST   | /api/deliveries/:id/cancel         | user_id, mutation_id → pending 전송 취소                                           |
+| POST   | /api/receipt-actions               | user_id, action_id, delivery_id → 광고/수신 준비 상태                              |
+| GET    | /api/receipt-actions/:id           | 본인의 광고/수신 상태 재조회                                                       |
+| POST   | /api/receipt-actions/:id/ad        | user_id, outcome → 개발 테스트 광고 결과 저장                                      |
+| POST   | /api/receipt-actions/:id/execute   | user_id → 최신 상태 검증 후 RECEIPT                                                |
+
+목록은 `{items,next_cursor}`이며 20개씩 반환합니다. `before`는 서버가 준 `timestamp:UUID` 커서를 그대로 사용합니다. 삭제·취소 항목은 받을 기록/개인 기록 목록에서 제외되며 전송 이력은 유지합니다.
+
+보내기는 기존 참여자, 종료 상태, 현재 슬롯 버전과 연결 사용자를 같은 트랜잭션에서 검사합니다. 같은 슬롯/수신자의 pending 전송이 있으면 기존 항목으로 연결합니다. 이미 활성 개인 기록이 있으면 `already_received`입니다. pending 전송은 보낸 사람·생성자·받는 사람만 취소할 수 있고 수신 완료 전송은 취소할 수 없습니다.
+
+수신은 참여자 등록과 별개입니다. 다른 진행 중 라운드가 있어도 받을 수 있으며 active_round_users를 변경하지 않습니다. 생성자/참여자의 기존 광고 이력을 재사용합니다. 미참여 수신자는 광고 처리 뒤 이력을 먼저 보관하고 실제 수신을 실행합니다. 광고 중 취소/연결 해제가 생기면 광고 이력은 유지하되 수신은 거절합니다. 테스트 환경에서만 완료/장애 결과를 받으며 interrupted는 인정하지 않습니다.
+
+실제 수신의 RECEIPT 생성·DELIVERY received·action 완료는 원자적으로 처리합니다. 활성 기기, 수신 사용자, pending 상태, 현재 슬롯 연결, ended 상태, 광고 이력, 활성 개인 기록 부재를 다시 확인합니다. 동시에 같은 전송을 받아도 개인 기록은 하나이며 같은 전송의 재시도는 원래 RECEIPT를 반환합니다.
+
+개인 삭제는 공동 라운드/점수/다른 사람의 기록과 과거 received 전송을 변경하지 않습니다. 삭제한 RECEIPT의 재조회·수신 재시도는 deleted 상태를 반환하고 sheet는 null입니다. 새로운 명시적 전송만 새 수신 항목이 됩니다. 예전 삭제 요청은 나중에 받은 새 RECEIPT를 삭제하지 않습니다.
+
+sheet는 전체 플레이어·홀별 점수·코스/PAR을 포함하는 읽기 전용 원본 조회입니다. 비참여 수신자에게 공동 입력 권한을 부여하지 않습니다. current_player는 현재 슬롯의 연결 사용자 일치 여부이고 can_manage는 기존 참여자인지 나타냅니다. peoria_runs는 9단계 전까지 빈 배열입니다.
+
+추가 오류: record_not_found/delivery_not_found(404), delivery_unavailable/already_received/player_link_changed/request_reused/user_changed/ad_required(409), forbidden(403), ads_not_configured(503). 서버 성공 전에는 앱에서 수신 완료로 표시하지 않습니다.

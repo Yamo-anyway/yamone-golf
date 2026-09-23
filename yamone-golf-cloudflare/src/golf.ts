@@ -9,6 +9,7 @@ import {
   type Round,
   type Check,
 } from "./round-store";
+import { recordsRoute } from "./records";
 import { lifecycleRoute } from "./round-lifecycle";
 import { scoresRoute } from "./scores";
 import { playersRoute } from "./players";
@@ -310,6 +311,8 @@ export async function golfRoute(request: Request, env: Env): Promise<Response> {
   const d = await authenticate(request, env);
   if (method !== "GET")
     await limit(request, env, `golf:${d.user_id}`, 120, 60_000);
+  const records = await recordsRoute(request, env, d);
+  if (records) return records;
   const lifecycle = await lifecycleRoute(request, env, d);
   if (lifecycle) return lifecycle;
   if (path === "/api/courses" && method === "GET") {
@@ -465,7 +468,7 @@ export async function golfRoute(request: Request, env: Env): Promise<Response> {
     ).all<{ course_snapshot: string }>();
     const ended = await stmt(
       env,
-      "SELECT r.* FROM rounds r JOIN round_participants p ON p.round_id=r.round_id WHERE p.user_id=? AND r.status='ended' ORDER BY r.ended_at DESC LIMIT 10",
+      "SELECT r.* FROM rounds r JOIN round_participants p ON p.round_id=r.round_id WHERE p.user_id=? AND r.status='ended' AND NOT EXISTS(SELECT 1 FROM receipts q WHERE q.round_id=r.round_id AND q.user_id=p.user_id) ORDER BY r.ended_at DESC LIMIT 10",
       d.user_id,
     ).all<Round>();
     return json({

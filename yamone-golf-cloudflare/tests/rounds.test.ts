@@ -122,6 +122,8 @@ beforeEach(async () => {
       "round_lifecycle_mutations",
       "round_completions",
       "round_endings",
+      "record_mutations",
+      "receipt_actions",
       "player_slots",
       "active_round_users",
       "round_participants",

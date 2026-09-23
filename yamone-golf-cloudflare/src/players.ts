@@ -68,7 +68,9 @@ async function roster(env: Env, round: string) {
       `SELECT p.slot_id,p.user_id,p.name AS temporary_name,COALESCE(u.nickname,p.name) AS name,p.position,p.version,u.personal_code,
   (SELECT count(*) FROM scores s WHERE s.slot_id=p.slot_id AND s.strokes IS NOT NULL) AS score_count,
   (SELECT count(*) FROM deliveries d WHERE d.slot_id=p.slot_id) AS delivery_count,
-  (SELECT count(*) FROM receipts r WHERE r.player_slot_id=p.slot_id) AS receipt_count
+  (SELECT count(*) FROM receipts r WHERE r.player_slot_id=p.slot_id) AS receipt_count,
+  (SELECT count(*) FROM receipts r WHERE r.round_id=p.round_id AND r.user_id=p.user_id AND r.status='received') AS received_current,
+  (SELECT delivery_id FROM deliveries d WHERE d.slot_id=p.slot_id AND d.recipient_id=p.user_id AND d.status='pending') AS pending_delivery_id
   FROM player_slots p LEFT JOIN users u ON p.user_id=u.user_id WHERE p.round_id=? AND p.deleted_at IS NULL ORDER BY p.position`,
       round,
     ),
@@ -182,8 +184,7 @@ export async function playersRoute(
   }
   const b = await body(request);
   if (area === "player-lookup" && !id && method === "POST") {
-    if ((await getRound(env, round)).status !== "active")
-      throw new ApiError("round_ended", 409);
+    await getRound(env, round);
     await limit(request, env, `player-lookup:${d.user_id}`, 30, 60000);
     const code = normalizePersonalCode(b.code);
     if (!code) throw new ApiError("invalid_personal_code");
@@ -216,11 +217,16 @@ export async function playersRoute(
     return json(await result());
   const renameOnly =
     area === "players" && !!id && method === "PATCH" && b.action === "rename";
+  const connectionOnly =
+    area === "players" &&
+    !!id &&
+    method === "PATCH" &&
+    ["link", "unlink"].includes(String(b.action));
   const roundState = await getRound(env, round);
-  if (!renameOnly && roundState.status !== "active")
+  if (!renameOnly && !connectionOnly && roundState.status !== "active")
     throw new ApiError("round_ended", 409);
   const checks =
-      renameOnly && roundState.status !== "active"
+      (renameOnly || connectionOnly) && roundState.status !== "active"
         ? liveMember(round, d).slice(1)
         : liveMember(round, d),
     writes: D1PreparedStatement[] = [];
@@ -403,6 +409,17 @@ export async function playersRoute(
       kind = "unlink";
       if (!old.user_id) throw new ApiError("player_changed", 409);
       const name = nickname(b.name);
+      // In-flight receives serialize against this cancellation. Completed receipts
+      // retain their original owner/slot; unlink never erases personal history.
+      writes.push(
+        stmt(
+          env,
+          "UPDATE deliveries SET status='cancelled',updated_at=? WHERE round_id=? AND slot_id=? AND status='pending'",
+          now(),
+          round,
+          id,
+        ),
+      );
       writes.push(
         stmt(
           env,
@@ -452,7 +469,11 @@ export async function playersRoute(
   } catch (e) {
     if (await replay(env, d, mutationId, requestHash))
       return json(await result());
-    if (!renameOnly && (await getRound(env, round)).status !== "active")
+    if (
+      !renameOnly &&
+      !connectionOnly &&
+      (await getRound(env, round)).status !== "active"
+    )
       throw new ApiError("round_ended", 409);
     throw e;
   }

@@ -119,6 +119,9 @@ beforeEach(async () => {
       "round_lifecycle_mutations",
       "round_completions",
       "round_endings",
+      "record_mutations",
+      "round_ad_settlements",
+      "receipt_actions",
       "receipts",
       "deliveries",
       "scores",
@@ -126,7 +129,6 @@ beforeEach(async () => {
       "input_target_lists",
       "player_audit",
       "player_mutations",
-      "round_ad_settlements",
       "round_actions",
       "round_invitations",
       "player_slots",
@@ -532,7 +534,7 @@ test("delete confirmation is rechecked against newer target selection and new sc
     .run();
   assert.equal((await remove(f, s)).data.error, "player_protected");
 });
-test("one remaining player cannot be deleted; ended rounds allow only unlinked name changes", async () => {
+test("one remaining player cannot be deleted; ended rounds retain names and lock adding/deleting slots", async () => {
   const f = await fixture(1);
   assert.equal((await remove(f, f.slots[0])).data.error, "last_player");
   assert.equal(

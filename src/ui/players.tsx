@@ -20,7 +20,7 @@ import { Heading, Problem } from "./courses";
 import { confirm, useDraftGuard, useLoad, useTask } from "./golf-hooks";
 import { DragRow } from "./drag-row";
 import { QRScanner } from "./qr-scanner";
-function useMutationId() {
+export function useMutationId() {
   const pending = useRef<{ body: string; id: string } | null>(null);
   return (body: unknown) => {
     const serialized = JSON.stringify(body);
@@ -69,8 +69,7 @@ function PlayerEditor({
     [impact, setImpact] = useState<DeleteImpact | null>(null);
   const [baseline, setBaseline] = useState(initial),
     [saved, setSaved] = useState(false);
-  const blocked =
-    task.busy || (!active && !(mode === "name" && !baseline?.user_id));
+  const blocked = task.busy || (!active && (!baseline || mode === "delete"));
   const dirty = !saved && (name !== (baseline?.name ?? "") || !!code);
   useDraftGuard(dirty);
   async function find(value = code) {
@@ -128,7 +127,7 @@ function PlayerEditor({
           <Button
             label={t(baseline.user_id ? "unlinkPlayer" : "linkPlayer")}
             secondary={mode !== (baseline.user_id ? "unlink" : "link")}
-            disabled={task.busy || !active}
+            disabled={task.busy}
             onPress={() => setMode(baseline.user_id ? "unlink" : "link")}
           />
           <Button
@@ -409,7 +408,7 @@ export function PlayersScreen() {
             label={t("managePlayer")}
             testID={"manage-" + p.slot_id}
             secondary
-            disabled={(!active && !!p.user_id) || !!editor}
+            disabled={!!editor}
             onPress={() => {
               setSaved(false);
               setEditor({ player: p });

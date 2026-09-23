@@ -261,6 +261,15 @@ export function RoundEndingScreen() {
           }
         />
       )}
+      {data?.status === "ended" && (
+        <Button
+          label={t("roundRecords")}
+          testID="ending-records"
+          onPress={() =>
+            router.push({ pathname: "/round-records", params: { id } })
+          }
+        />
+      )}
       <Button
         label={t("refresh")}
         secondary

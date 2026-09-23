@@ -199,7 +199,8 @@ const en: Record<keyof typeof ko, string> = {
     "Check the nickname and personal code. Linking does not add a recorder or show an ad.",
   unlinkHelp:
     "Only the user link is removed. This player slot and its existing scores stay.",
-  unlinkConfirm: "Unlink this user? Existing scores will stay.",
+  unlinkConfirm:
+    "Unlink this user? The slot and scores stay. Pending deliveries are cancelled; received personal records are kept.",
   savePlayer: "Save player",
   addPlayerName: "New player name",
   deleteImpact: "Review deletion impact",
@@ -214,7 +215,7 @@ const en: Record<keyof typeof ko, string> = {
   confirmDeletePlayer: "Confirm deletion",
   lastPlayerHelp: "A round needs at least one player.",
   playersReadOnly:
-    "After the round ends, only unlinked player names can be changed here.",
+    "After ending, manage temporary names and user links. Adding or deleting players and score entry remain locked.",
   playerDraftChanged:
     "Another participant changed the player data. Your draft is still here. Review the latest version before editing again.",
   targetDraftChanged:
@@ -385,5 +386,60 @@ const en: Record<keyof typeof ko, string> = {
   endNoExtraAd: "No additional ad is required to end this round.",
   roundActivityHelp:
     "The server ends this round after 6 hours without record changes.",
+  recordsTitle: "Golf records",
+  recordsToReceive: "Records to receive",
+  receivedRecords: "Received records",
+  receivedRecord: "Received round",
+  openRecords: "View golf records",
+  openReceivedRecord: "View full round",
+  noRecordsToReceive: "No records waiting to be received.",
+  noReceivedRecords: "No received records yet.",
+  receiveRecord: "Receive record",
+  receiveMyRecord: "Receive my record",
+  confirmReceive: "Add to my records",
+  roundRecords: "Send / Receive records",
+  sendRecord: "Send record",
+  sendRecordAgain: "Send a new delivery",
+  deliveryHistory: "Delivery history",
+  sentBy: "Sent by",
+  deliveryPending: "Awaiting receipt",
+  deliveryReceived: "Received",
+  deliveryCancelled: "Cancelled",
+  moreRecords: "Show more",
+  declineRecord: "Decline record",
+  declineRecordHelp:
+    "Decline this delivery? The original round remains. You can receive a new delivery later.",
+  cancelDelivery: "Cancel delivery",
+  cancelDeliveryHelp: "Cancel this delivery if it has not been received yet?",
+  deliveryHelp:
+    "Link each player by personal code or QR, then send. Receiving adds the whole round to that user’s records.",
+  receiveWholeRound:
+    "View the course, every player’s hole-by-hole scores and rankings in your records.",
+  receivedWholeRoundHelp:
+    "The full received round, including all players’ scores.",
+  receiveAdSettled:
+    "The ad for this round is settled. Continue without another ad.",
+  resumeReceipt: "Continue receiving",
+  receiptPendingHelp:
+    "A receive request is in progress. Continue to check its result.",
+  backToRecords: "Back to records",
+  cancelReceiveHelp:
+    "Stop here and return to the list? Completed ad and receive results will be kept.",
+  deletePersonalRecord: "Delete from my records",
+  deleteRecordHelp:
+    "Delete this personal record? The shared round and others’ records remain. Old deliveries will not return. A new delivery is needed to receive it again.",
+  recordDeleted:
+    "This personal record was deleted. Rechecking its old receive request does not restore it.",
+  round_not_ended: "Records can be sent after the round ends.",
+  delivery_not_found: "Delivery not found.",
+  delivery_unavailable:
+    "This delivery was cancelled or its player link changed. Refresh the list.",
+  delivery_received: "This delivery has been received and cannot be cancelled.",
+  already_received: "This round is already in the recipient’s records.",
+  record_not_found: "This item was not found in your records.",
+  receipt_pending_corrupt:
+    "The saved receive request could not be read. The original data has been preserved.",
+  receipt_pending_missing:
+    "No saved receive request. Select a record to receive.",
 };
 export default en;
