@@ -36,6 +36,9 @@ async function main() {
           "tests/records-ui.ts",
           "tests/personal-ui.ts",
           "tests/peoria-ui.ts",
+          ...(process.env.EXPO_PUBLIC_ADS_BANNER_FIXTURE === "1"
+            ? ["tests/ads-ui.ts"]
+            : []),
         ]) {
       // Each suite owns its D1 and rate-limit buckets. Production limits stay intact.
       const api = spawn(

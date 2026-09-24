@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useRecordBanner } from "./banner-context";
 import { View } from "react-native";
 import { router, useLocalSearchParams } from "expo-router";
 import type { PeoriaHistory } from "../../shared/peoria";
@@ -45,6 +46,10 @@ export function PeoriaScreen() {
   const h = query.error === "forbidden" ? null : query.data,
     pending = pendingQuery.data?.pending;
   const run = h?.runs.find((r) => r.run_id === selected) ?? h?.runs[0];
+  useRecordBanner(
+    "peoria",
+    origin === "record" && !!h && !query.error && !confirmation && !task.busy,
+  );
   const busy = task.busy;
   const date = (at: number) =>
     new Date(at).toLocaleString(lang === "ko" ? "ko-KR" : "en-US");

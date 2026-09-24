@@ -7,7 +7,9 @@ import { corrections } from "../data/corrections";
 import { router, useLocalSearchParams } from "expo-router";
 import { records, receiptFlow, receiveAPI } from "../data/records";
 import { players } from "../data/players";
-import type { AdResult } from "../data/golf";
+import type { AdEvidence } from "../data/ad-config";
+import { presentInterstitial, waitUntilAdForeground } from "../data/mobile-ads";
+import { AdAction, useAdActionLifetime } from "./ad-action";
 import type { Delivery } from "../../shared/records";
 import { Button, Card, colors, Field, Txt } from "./components";
 import { Heading, Problem } from "./courses";
@@ -15,6 +17,7 @@ import { useSession } from "./session";
 import { confirm, useLoad, useTask } from "./golf-hooks";
 import { useMutationId } from "./players";
 import { ScorecardContent } from "./scores";
+import { useRecordBanner } from "./banner-context";
 async function beginReceive(user: string, delivery: string) {
   await receiptFlow(user).begin(delivery);
   router.push("/receive-record");
@@ -455,6 +458,10 @@ export function RoundDeliveriesScreen() {
   );
 }
 export function ReceiveRecordScreen() {
+  const lifetime = useAdActionLifetime();
+  const terminal = useRef<{ action: string; evidence: AdEvidence } | null>(
+    null,
+  );
   const { profile, t } = useSession(),
     task = useTask(),
     flow = receiptFlow(profile!.user_id);
@@ -465,13 +472,39 @@ export function ReceiveRecordScreen() {
       : null;
   });
   const data = query.data;
-  async function finish(outcome?: AdResult) {
+  async function finish(mock?: AdEvidence, showAd = false) {
     if (!data) return;
     await task.run(async () => {
-      if (outcome) {
-        const pending = await flow.outcome(data!.pending.action_id, outcome);
+      const signal = lifetime.current.signal;
+      const pendingBefore = await flow.read();
+      if (!pendingBefore || pendingBefore.action_id !== data.pending.action_id)
+        throw { code: "state_changed" };
+      const current = await receiveAPI.prepare(pendingBefore);
+      let evidence =
+        terminal.current?.action === pendingBefore.action_id
+          ? terminal.current.evidence
+          : undefined;
+      if (
+        !pendingBefore.outcome &&
+        !current.ad_settled &&
+        !current.completed_receipt &&
+        showAd &&
+        !evidence
+      ) {
+        evidence =
+          mock ?? (await presentInterstitial(current.test_ads, signal));
+        terminal.current = { action: pendingBefore.action_id, evidence };
+      }
+      if (evidence) {
+        const pending = await flow.outcome(
+          data!.pending.action_id,
+          evidence.outcome,
+          evidence.source,
+        );
+        terminal.current = null;
         query.setData({ ...data!, pending });
       }
+      await waitUntilAdForeground(signal);
       const receipt = await flow.finish(receiveAPI);
       router.replace({
         pathname: "/record",
@@ -504,26 +537,13 @@ export function ReceiveRecordScreen() {
                   onPress={() => void finish()}
                 />
               </Card>
-            ) : data.action.test_ads ? (
-              <Card>
-                <Txt style={{ fontWeight: "700" }}>{t("testAdTitle")}</Txt>
-                <Txt>{t("testAdBody")}</Txt>
-                <Button
-                  label={t("testAdComplete")}
-                  testID="receive-ad-complete"
-                  busy={task.busy}
-                  onPress={() => void finish("completed")}
-                />
-                <Button
-                  label={t("testAdUnavailable")}
-                  testID="receive-ad-unavailable"
-                  secondary
-                  disabled={task.busy}
-                  onPress={() => void finish("unavailable")}
-                />
-              </Card>
             ) : (
-              <Txt>{t("ads_not_configured")}</Txt>
+              <AdAction
+                prefix="receive-"
+                testAllowed={data.action.test_ads}
+                busy={task.busy}
+                onRun={(mock) => void finish(mock, true)}
+              />
             )
           ) : (
             <Txt>{t("delivery_unavailable")}</Txt>
@@ -568,6 +588,12 @@ export function RecordScreen() {
     makeId = useMutationId();
   const query = useLoad(() => records.detail(id));
   const data = query.data;
+  useRecordBanner(
+    "record-detail",
+    !query.error &&
+      data?.receipt.status === "received" &&
+      data?.sheet?.status === "ended",
+  );
   return (
     <>
       <Heading title={t("receivedRecord")} />

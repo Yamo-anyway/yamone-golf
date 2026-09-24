@@ -227,3 +227,11 @@ sheet는 전체 플레이어·홀별 점수·코스/PAR을 포함하는 읽기 �
 - 생성자 또는 종료 위임 참여자만 종료+3시간 미만에 실행합니다. 현재 원본/이름/플레이어/이력/권한 버전이 확인 당시와 달라지면 peoria_changed(409)로 새 확인을 요구합니다.
 - 새 성공 201, 동일 요청 재확인 200. 응답 {request_id,run_id,replayed}. 원래 요청은 마감/횟수 소진 뒤에도 성공 결과를 재확인합니다. 본문을 바꾼 ID 재사용은 request_reused(409)입니다.
 - 계산 쓰기와 Snapshot·내부 추첨·중복방지 정보를 하나의 원자적 행으로 저장합니다. UPDATE/DELETE 실행 API는 없습니다. 내부 계산 정보는 ACK에 포함하지 않습니다.
+
+# 광고 SDK 개발 연결 추가 — v0.3.10
+
+`GET /api/ad-config`: 활성 기기 인증 후 `{ test_ads: boolean, production_ads: false }`. 서버 시험 환경 여부가 유일한 test_ads 기준입니다.
+
+`POST /api/round-actions/:id/ad`와 `POST /api/receipt-actions/:id/ad`는 기존 outcome 외에 선택적 source(`development-test`/`admob-test`)를 받습니다. 생략 시 이전 저장본을 위한 development-test입니다. 알려진 source라도 production/unknown 환경에서는 503 ads_not_configured입니다. 이미 저장된 시험 증빙이 있는 DB를 운영 환경으로 가져와도 새 execute를 허용하지 않습니다. 기존에 성공한 작업의 조회·멱등 재확인은 추가 생성과 구분합니다.
+
+참여 ad는 실제 참여 전 round_ad_settlements를 보관합니다. 이 API의 성공은 참여·수신 성공이 아니며 execute가 최신 초대/종료/권한을 재검사합니다. source는 신뢰할 수 있는 광고 제공자 서명이 아니라 진단용 시험 출처입니다. 자세한 미완료 운영 경계는 ADS.md를 참조하세요.

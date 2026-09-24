@@ -11,3 +11,4 @@ dist-android/
 qa/
 *.log
 *.tsbuildinfo
+.automation-lock/

@@ -10,6 +10,7 @@ import {
   type Check,
 } from "./round-store";
 import { personalRecordsRoute } from "./personal-records";
+import { allowsTestAds, testAdEvidence } from "./ad-settlement";
 import { peoriaRoute } from "./peoria";
 import { recordsRoute } from "./records";
 import { lifecycleRoute } from "./round-lifecycle";
@@ -171,11 +172,11 @@ async function actionView(env: Env, d: Device, a: Action) {
   return {
     action_id: a.action_id,
     kind: a.kind,
-    ad_settled: !!a.ad_outcome || !!settled,
+    ad_settled: allowsTestAds(env.ENVIRONMENT) && (!!a.ad_outcome || !!settled),
     completed_round_id: a.completed_round_id,
     summary:
       a.kind === "create" ? p : roundView(await getRound(env, p.round_id)),
-    test_ads: ["development", "test", "ui-test"].includes(env.ENVIRONMENT),
+    test_ads: allowsTestAds(env.ENVIRONMENT),
   };
 }
 async function execute(env: Env, d: Device, a: Action) {
@@ -183,6 +184,10 @@ async function execute(env: Env, d: Device, a: Action) {
     return json({
       round: roundView(await getRound(env, a.completed_round_id)),
     });
+  // A database copied from development must not upgrade test settlements into
+  // production proof. Historical completed reads are safe; new writes are not.
+  if (!allowsTestAds(env.ENVIRONMENT))
+    throw new ApiError("ads_not_configured", 503);
   await precheck(env, d, a);
   const p = JSON.parse(a.payload_json);
   const existing =
@@ -311,6 +316,11 @@ export async function golfRoute(request: Request, env: Env): Promise<Response> {
     path = url.pathname,
     method = request.method;
   const d = await authenticate(request, env);
+  if (path === "/api/ad-config" && method === "GET")
+    return json({
+      test_ads: allowsTestAds(env.ENVIRONMENT),
+      production_ads: false,
+    });
   if (method !== "GET")
     await limit(request, env, `golf:${d.user_id}`, 120, 60_000);
   const personal = await personalRecordsRoute(request, env, d);
@@ -635,34 +645,32 @@ export async function golfRoute(request: Request, env: Env): Promise<Response> {
     if (!am[2] && method === "GET") return json(await actionView(env, d, a));
     if (am[2] === "ad" && method === "POST") {
       const b = await body(request);
-      // Stage 2 has no production ad SDK. Test settlement is explicitly blocked in production.
-      if (!["development", "test", "ui-test"].includes(env.ENVIRONMENT))
-        throw new ApiError("ads_not_configured", 503);
-      if (
-        ![
-          "completed",
-          "unavailable",
-          "load_failed",
-          "show_failed",
-          "load_timeout",
-        ].includes(String(b.outcome))
-      )
-        throw new ApiError("ad_interrupted", 409);
-      await precheck(env, d, a);
-      await atomic(
-        env,
-        d,
-        [],
-        [
+      const evidence = testAdEvidence(env.ENVIRONMENT, b);
+      const time = now();
+      const writes = [
+        stmt(
+          env,
+          "UPDATE round_actions SET ad_outcome=?,ad_source=?,ad_settled_at=? WHERE action_id=? AND ad_outcome IS NULL",
+          evidence.outcome,
+          evidence.source,
+          time,
+          a.action_id,
+        ),
+      ];
+      if (a.kind === "join") {
+        const p = JSON.parse(a.payload_json);
+        writes.push(
           stmt(
             env,
-            "UPDATE round_actions SET ad_outcome=?,ad_source='development-test',ad_settled_at=? WHERE action_id=? AND ad_outcome IS NULL",
-            String(b.outcome),
-            now(),
+            "INSERT INTO round_ad_settlements(user_id,round_id,action_id,outcome,source,settled_at) SELECT user_id,?,action_id,ad_outcome,ad_source,ad_settled_at FROM round_actions WHERE action_id=? ON CONFLICT(user_id,round_id) DO NOTHING",
+            p.round_id,
             a.action_id,
           ),
-        ],
-      );
+        );
+      }
+      // Settlement grants no round access. Keep proof if the invitation/round
+      // changed during the ad; execute still rechecks every current permission.
+      await atomic(env, d, [], writes);
       return json(await actionView(env, d, await action(env, d, a.action_id)));
     }
     if (am[2] === "execute" && method === "POST") return execute(env, d, a);

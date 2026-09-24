@@ -94,6 +94,20 @@ test("interrupted ad survives restart as unfinished and does not receive a recor
   assert.equal(f.settled, false);
   assert.equal((await next.read())!.action_id, p.action_id);
 });
+test("native test attribution survives restart and failed feature response with original id", async () => {
+  const f = fixture(),
+    flow = f.make(),
+    p = await flow.begin("delivery");
+  await flow.outcome(p.action_id, "completed", "admob-test");
+  f.lose = true;
+  await assert.rejects(flow.finish(f.api));
+  const restored = f.make();
+  assert.equal((await restored.read())?.source, "admob-test");
+  await restored.finish(f.api);
+  assert.deepEqual(f.requests[0], f.requests[1]);
+  assert.equal(f.requests[1].action_id, p.action_id);
+  assert.equal(f.requests[1].source, "admob-test");
+});
 test("ad outcome is durable before settlement; replay after lost receive response cannot duplicate or restore a deleted receipt", async () => {
   const f = fixture(),
     flow = f.make(),

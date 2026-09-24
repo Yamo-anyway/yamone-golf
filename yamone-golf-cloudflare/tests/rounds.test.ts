@@ -364,6 +364,139 @@ test("server rechecks round state after ad; a completed ad remains settled after
   );
   assert.equal((await req("/api/home", b.token)).data.active_round, null);
 });
+test("round ending DURING native test ad keeps one settlement but grants no membership", async () => {
+  const a = await user(),
+    b = await user(),
+    c = await course(a.token),
+    r = await create(a.token, c);
+  const p = (
+    await req("/api/round-actions", b.token, {
+      action_id: randomUUID(),
+      kind: "join",
+      code: r.join_code,
+    })
+  ).data;
+  await db
+    .prepare("UPDATE rounds SET status='ended',ended_at=? WHERE round_id=?")
+    .bind(Date.now(), r.round_id)
+    .run();
+  const settled = await req(
+    "/api/round-actions/" + p.action_id + "/ad",
+    b.token,
+    { outcome: "completed", source: "admob-test" },
+  );
+  assert.equal(settled.status, 200);
+  assert.equal(settled.data.ad_settled, true);
+  assert.equal((await execute(b.token, p.action_id)).data.error, "round_ended");
+  assert.equal((await req("/api/home", b.token)).data.active_round, null);
+  const saved = await db
+    .prepare(
+      "SELECT source,outcome FROM round_ad_settlements WHERE user_id=? AND round_id=?",
+    )
+    .bind(b.user_id, r.round_id)
+    .all();
+  assert.deepEqual(saved.results, [
+    { source: "admob-test", outcome: "completed" },
+  ]);
+  await settle(b.token, p.action_id, "load_failed");
+  assert.equal(
+    (
+      await db
+        .prepare(
+          "SELECT source FROM round_ad_settlements WHERE user_id=? AND round_id=?",
+        )
+        .bind(b.user_id, r.round_id)
+        .first()
+    )?.source,
+    "admob-test",
+  );
+  assert.equal(
+    await db
+      .prepare(
+        "SELECT 1 FROM round_participants WHERE user_id=? AND round_id=?",
+      )
+      .bind(b.user_id, r.round_id)
+      .first(),
+    null,
+  );
+});
+test("native test source is idempotent and authenticated ad config cannot open production settlement", async () => {
+  const a = await user(),
+    c = await course(a.token),
+    p = await prepare(a.token, c);
+  const path = "/api/round-actions/" + p.action_id + "/ad";
+  assert.equal((await req("/api/ad-config", a.token)).data.test_ads, true);
+  const worker = (await import("../src/index")).default;
+  const env = {
+    DB: db as any,
+    ENVIRONMENT: "production",
+    ALLOWED_ORIGINS: "https://app.test",
+  };
+  const config = await worker.fetch(
+    new Request("https://api.test/api/ad-config", {
+      headers: { Authorization: "Bearer " + a.token },
+    }),
+    env,
+  );
+  assert.deepEqual(await config.json(), {
+    test_ads: false,
+    production_ads: false,
+  });
+  for (const source of ["admob-test", "development-test", "admob"]) {
+    const response = await worker.fetch(
+      new Request("https://api.test" + path, {
+        method: "POST",
+        headers: {
+          Authorization: "Bearer " + a.token,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ outcome: "completed", source }),
+      }),
+      env,
+    );
+    assert.equal(response.status, 503);
+  }
+  assert.equal(
+    (await req("/api/round-actions/" + p.action_id, a.token)).data.ad_settled,
+    false,
+  );
+  assert.equal(
+    (await req(path, a.token, { outcome: "completed", source: "admob-test" }))
+      .status,
+    200,
+  );
+  const blocked = await worker.fetch(
+    new Request(
+      "https://api.test/api/round-actions/" + p.action_id + "/execute",
+      {
+        method: "POST",
+        headers: {
+          Authorization: "Bearer " + a.token,
+          "Content-Type": "application/json",
+        },
+        body: "{}",
+      },
+    ),
+    env,
+  );
+  assert.equal(
+    blocked.status,
+    503,
+    "stored test proof cannot migrate into production permission",
+  );
+  assert.equal((await req("/api/home", a.token)).data.active_round, null);
+  assert.equal((await execute(a.token, p.action_id)).status, 201);
+  await settle(a.token, p.action_id, "unavailable");
+  assert.equal(
+    (
+      await db
+        .prepare("SELECT source FROM round_ad_settlements WHERE user_id=?")
+        .bind(a.user_id)
+        .first()
+    )?.source,
+    "admob-test",
+  );
+});
 test("home invitation decline releases no membership; accepting links only a participant and is idempotent", async () => {
   const a = await user(),
     b = await user(),

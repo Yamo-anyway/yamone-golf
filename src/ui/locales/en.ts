@@ -142,6 +142,16 @@ const en: Record<keyof typeof ko, string> = {
   resumeRound: "Resume action",
   roundReview: "Review round action",
   testAdTitle: "Development ad test",
+  nativeAdHelp:
+    "Show a test ad using the native SDK. After dismissal or an ad loading/display failure, we recheck the latest state before continuing.",
+  nativeAdContinue: "View ad and continue",
+  ad_native_build_required:
+    "A new development build with the ad SDK is required. Expo Go cannot display native ads.",
+  ad_busy: "Another ad is being processed. Please try again shortly.",
+  adPrivacy: "Ad privacy choices",
+  adPrivacyNotRequired:
+    "The ad provider has no privacy options form to show right now.",
+  adBannerFixture: "Layout test banner · not a real ad",
   testAdBody:
     "Real ads are not connected yet. Choose a result to test the action flow.",
   testAdComplete: "Test completed ad",

@@ -1,10 +1,12 @@
 import type { AdResult } from "./golf";
+import type { AdSource } from "./ad-config";
 import type { Receipt, ReceiveAction } from "../../shared/records";
 export type PendingReceipt = {
   user_id: string;
   action_id: string;
   delivery_id: string;
   outcome?: AdResult;
+  source?: AdSource;
 };
 export type ReceiptAPI = {
   prepare: (p: PendingReceipt) => Promise<ReceiveAction>;
@@ -36,6 +38,8 @@ export class ReceiptFlow {
         p.user_id !== this.user ||
         typeof p.action_id !== "string" ||
         typeof p.delivery_id !== "string" ||
+        (p.source !== undefined &&
+          !["development-test", "admob-test"].includes(p.source)) ||
         (p.outcome &&
           ![
             "completed",
@@ -71,11 +75,15 @@ export class ReceiptFlow {
       return p;
     });
   }
-  outcome(action: string, outcome: AdResult) {
+  outcome(
+    action: string,
+    outcome: AdResult,
+    source: AdSource = "development-test",
+  ) {
     return this.locked(async () => {
       const p = await this.read();
       if (!p || p.action_id !== action) throw { code: "state_changed" };
-      const next = { ...p, outcome };
+      const next = { ...p, outcome, source };
       await this.storage.setItem(this.key, JSON.stringify(next));
       return next;
     });

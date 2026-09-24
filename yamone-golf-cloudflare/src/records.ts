@@ -1,3 +1,4 @@
+import { allowsTestAds, testAdEvidence } from "./ad-settlement";
 import {
   type Env,
   type Device,
@@ -166,13 +167,15 @@ async function actionView(
   return {
     action_id: a.action_id,
     delivery: publicDelivery(v, d),
-    ad_settled: !!(await stmt(
-      env,
-      "SELECT 1 FROM round_ad_settlements WHERE user_id=? AND round_id=?",
-      d.user_id,
-      v.round_id,
-    ).first()),
-    test_ads: ["development", "test", "ui-test"].includes(env.ENVIRONMENT),
+    ad_settled:
+      allowsTestAds(env.ENVIRONMENT) &&
+      !!(await stmt(
+        env,
+        "SELECT 1 FROM round_ad_settlements WHERE user_id=? AND round_id=?",
+        d.user_id,
+        v.round_id,
+      ).first()),
+    test_ads: allowsTestAds(env.ENVIRONMENT),
     completed_receipt: a.completed_receipt_id
       ? await receipt(env, d, a.completed_receipt_id)
       : v.status === "received"
@@ -203,6 +206,8 @@ async function execute(env: Env, d: Device, a: Action) {
     if (old) return json({ receipt: old });
   }
   if (!validDelivery(v, d)) throw new ApiError("delivery_unavailable", 409);
+  if (!allowsTestAds(env.ENVIRONMENT))
+    throw new ApiError("ads_not_configured", 503);
   if (
     !(await stmt(
       env,
@@ -639,18 +644,7 @@ export async function recordsRoute(
       const v = await delivery(env, a.delivery_id);
       if ((await actionView(env, d, a)).ad_settled)
         return json(await actionView(env, d, a));
-      if (!["development", "test", "ui-test"].includes(env.ENVIRONMENT))
-        throw new ApiError("ads_not_configured", 503);
-      if (
-        ![
-          "completed",
-          "unavailable",
-          "load_failed",
-          "show_failed",
-          "load_timeout",
-        ].includes(String(b.outcome))
-      )
-        throw new ApiError("ad_interrupted", 409);
+      const evidence = testAdEvidence(env.ENVIRONMENT, b);
       const time = now();
       // Ad settlement remains valid even if a sender cancelled during the ad.
       // It grants no receipt. Execute must still recheck delivery and slot ownership.
@@ -661,19 +655,17 @@ export async function recordsRoute(
         [
           stmt(
             env,
-            "UPDATE receipt_actions SET ad_outcome=?,ad_source='development-test',ad_settled_at=? WHERE action_id=? AND ad_outcome IS NULL",
-            String(b.outcome),
+            "UPDATE receipt_actions SET ad_outcome=?,ad_source=?,ad_settled_at=? WHERE action_id=? AND ad_outcome IS NULL",
+            evidence.outcome,
+            evidence.source,
             time,
             a.action_id,
           ),
           stmt(
             env,
-            "INSERT INTO round_ad_settlements(user_id,round_id,receive_action_id,outcome,source,settled_at) VALUES(?,?,?,?,'development-test',?) ON CONFLICT(user_id,round_id) DO NOTHING",
-            d.user_id,
+            "INSERT INTO round_ad_settlements(user_id,round_id,receive_action_id,outcome,source,settled_at) SELECT user_id,?,action_id,ad_outcome,ad_source,ad_settled_at FROM receipt_actions WHERE action_id=? ON CONFLICT(user_id,round_id) DO NOTHING",
             v.round_id,
             a.action_id,
-            String(b.outcome),
-            time,
           ),
         ],
       );

@@ -2,20 +2,17 @@
   "expo": {
     "name": "Yamone Golf Dev",
     "slug": "yamone-golf-cloudflare-dev",
-    "version": "0.3.9",
+    "version": "0.3.10",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.yamone.golf.dev",
-      "buildNumber": "12",
+      "buildNumber": "13",
       "infoPlist": {
         "CFBundleDevelopmentRegion": "en",
-        "CFBundleLocalizations": [
-          "ko",
-          "en"
-        ]
+        "CFBundleLocalizations": ["ko", "en"]
       }
     },
     "android": {
@@ -25,7 +22,7 @@
       },
       "predictiveBackGestureEnabled": false,
       "package": "com.yamone.golf.dev",
-      "versionCode": 12,
+      "versionCode": 13,
       "blockedPermissions": [
         "android.permission.RECORD_AUDIO",
         "android.permission.READ_EXTERNAL_STORAGE",
@@ -49,6 +46,15 @@
           "microphonePermission": false,
           "recordAudioAndroid": false,
           "barcodeScannerEnabled": true
+        }
+      ],
+      [
+        "react-native-google-mobile-ads",
+        {
+          "androidAppId": "ca-app-pub-3940256099942544~3347511713",
+          "iosAppId": "ca-app-pub-3940256099942544~1458002511",
+          "androidSdk": "nextgen",
+          "delayAppMeasurementInit": true
         }
       ]
     ],

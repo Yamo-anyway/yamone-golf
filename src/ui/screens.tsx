@@ -10,7 +10,15 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { router, usePathname } from "expo-router";
-import { useNavigation, usePreventRemove } from "expo-router/react-navigation";
+import {
+  useIsFocused,
+  useNavigation,
+  usePreventRemove,
+} from "expo-router/react-navigation";
+import { AdBanner } from "./ad-banner";
+import { AdPrivacy } from "./ad-privacy";
+import { BannerPlacement } from "./banner-context";
+import { showBanner, type BannerContext } from "../data/ad-policy";
 import Svg, { Path, Rect } from "react-native-svg";
 import { create } from "qrcode/lib/core/qrcode";
 import { Button, Card, colors, Field, styles, Txt } from "./components";
@@ -293,6 +301,7 @@ export function ProfileScreen() {
           {s.t("languageHint")}
         </Txt>
       </Card>
+      <AdPrivacy />
     </>
   );
 }
@@ -362,94 +371,111 @@ function Gate({ children }: { children: React.ReactNode }) {
   );
 }
 export function Shell({ children }: { children: React.ReactNode }) {
+  const [detailBanner, setDetailBanner] = useState<BannerContext | null>(null);
+  const focused = useIsFocused();
   const s = useSession(),
     error = useErrorText(),
     path = usePathname();
+  const context: BannerContext =
+    detailBanner ??
+    (path === "/"
+      ? { screen: "home", flow: "browse" }
+      : path === "/records"
+        ? { screen: "record-list", flow: "record" }
+        : path === "/statistics"
+          ? { screen: "statistics", flow: "record" }
+          : { screen: "other", flow: "round" });
+  const bannerAllowed = focused && s.phase === "ready" && showBanner(context);
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: colors.paper }}>
-      <KeyboardAvoidingView
-        style={{ flex: 1 }}
-        behavior={Platform.OS === "ios" ? "padding" : undefined}
-      >
-        <View
-          style={{
-            paddingHorizontal: 22,
-            paddingVertical: 18,
-            borderBottomWidth: 1,
-            borderColor: colors.line,
-          }}
+    <BannerPlacement.Provider value={setDetailBanner}>
+      <SafeAreaView style={{ flex: 1, backgroundColor: colors.paper }}>
+        <KeyboardAvoidingView
+          style={{ flex: 1 }}
+          behavior={Platform.OS === "ios" ? "padding" : undefined}
         >
-          <Txt style={{ fontSize: 15, letterSpacing: 2, fontWeight: "800" }}>
-            {s.t("brand")}
-          </Txt>
-        </View>
-        <ScrollView
-          keyboardShouldPersistTaps="handled"
-          contentContainerStyle={{
-            padding: 22,
-            paddingBottom: 32,
-            gap: 20,
-            maxWidth: 520,
-            width: "100%",
-            alignSelf: "center",
-            flexGrow: 1,
-          }}
-        >
-          {error && (
-            <View
-              accessibilityRole="alert"
-              style={{
-                backgroundColor: "#FCECE7",
-                padding: 14,
-                borderRadius: 12,
-              }}
-            >
-              <Txt style={{ color: colors.error }}>{error}</Txt>
-            </View>
-          )}
-          {s.offline && (
-            <Txt
-              testID="offline-session"
-              style={{ fontSize: 13, color: colors.muted }}
-            >
-              {s.t("offlineSession")}
-            </Txt>
-          )}
-          <Gate>{children}</Gate>
-        </ScrollView>
-        {s.phase === "ready" && (
           <View
             style={{
-              borderTopWidth: 1,
+              paddingHorizontal: 22,
+              paddingVertical: 18,
+              borderBottomWidth: 1,
               borderColor: colors.line,
-              backgroundColor: "#FFFFFF",
-              flexDirection: "row",
             }}
           >
-            {(["/", "/profile"] as const).map((route) => (
-              <Pressable
-                key={route}
-                accessibilityRole="tab"
-                accessibilityState={{ selected: path === route }}
-                onPress={() => {
-                  if (path !== route) router.dismissTo(route);
-                }}
+            <Txt style={{ fontSize: 15, letterSpacing: 2, fontWeight: "800" }}>
+              {s.t("brand")}
+            </Txt>
+          </View>
+          <ScrollView
+            testID="screen-scroll"
+            keyboardShouldPersistTaps="handled"
+            contentContainerStyle={{
+              padding: 22,
+              paddingBottom: 32,
+              gap: 20,
+              maxWidth: 520,
+              width: "100%",
+              alignSelf: "center",
+              flexGrow: 1,
+            }}
+          >
+            {error && (
+              <View
+                accessibilityRole="alert"
                 style={{
-                  flex: 1,
-                  padding: 18,
-                  minHeight: 58,
-                  alignItems: "center",
-                  backgroundColor: path === route ? colors.mint : "#FFFFFF",
+                  backgroundColor: "#FCECE7",
+                  padding: 14,
+                  borderRadius: 12,
                 }}
               >
-                <Txt style={{ fontWeight: path === route ? "800" : "500" }}>
-                  {s.t(route === "/" ? "home" : "profile")}
-                </Txt>
-              </Pressable>
-            ))}
-          </View>
-        )}
-      </KeyboardAvoidingView>
-    </SafeAreaView>
+                <Txt style={{ color: colors.error }}>{error}</Txt>
+              </View>
+            )}
+            {s.offline && (
+              <Txt
+                testID="offline-session"
+                style={{ fontSize: 13, color: colors.muted }}
+              >
+                {s.t("offlineSession")}
+              </Txt>
+            )}
+            <Gate>{children}</Gate>
+          </ScrollView>
+          {bannerAllowed && <AdBanner />}
+          {s.phase === "ready" && (
+            <View
+              testID="bottom-navigation"
+              style={{
+                borderTopWidth: 1,
+                borderColor: colors.line,
+                backgroundColor: "#FFFFFF",
+                flexDirection: "row",
+              }}
+            >
+              {(["/", "/profile"] as const).map((route) => (
+                <Pressable
+                  key={route}
+                  accessibilityRole="tab"
+                  accessibilityState={{ selected: path === route }}
+                  onPress={() => {
+                    if (path !== route) router.dismissTo(route);
+                  }}
+                  style={{
+                    flex: 1,
+                    padding: 18,
+                    minHeight: 58,
+                    alignItems: "center",
+                    backgroundColor: path === route ? colors.mint : "#FFFFFF",
+                  }}
+                >
+                  <Txt style={{ fontWeight: path === route ? "800" : "500" }}>
+                    {s.t(route === "/" ? "home" : "profile")}
+                  </Txt>
+                </Pressable>
+              ))}
+            </View>
+          )}
+        </KeyboardAvoidingView>
+      </SafeAreaView>
+    </BannerPlacement.Provider>
   );
 }

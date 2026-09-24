@@ -1,17 +1,19 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { View } from "react-native";
 import { router, useLocalSearchParams } from "expo-router";
 import * as Crypto from "expo-crypto";
 import {
   golf,
   pendingRound,
-  type AdResult,
   type Course,
   type CreateInput,
   type JoinInput,
   type PendingRound,
 } from "../data/golf";
 import { RecordsHomeEntry } from "./records";
+import type { AdEvidence } from "../data/ad-config";
+import { presentInterstitial, waitUntilAdForeground } from "../data/mobile-ads";
+import { AdAction, useAdActionLifetime } from "./ad-action";
 import { EndedRoundSummary } from "./round-ending";
 import { useOfflineScores } from "./offline-scores";
 import { useSession } from "./session";
@@ -434,6 +436,10 @@ export function JoinRoundScreen() {
 }
 export function RoundActionScreen() {
   const { profile, t } = useSession();
+  const lifetime = useAdActionLifetime();
+  const terminal = useRef<{ action: string; evidence: AdEvidence } | null>(
+    null,
+  );
   const query = useLoad(async () => {
     const pending = await pendingRound.read(profile!.user_id);
     if (!pending) return null;
@@ -441,19 +447,46 @@ export function RoundActionScreen() {
   });
   const task = useTask();
   const data = query.data;
-  async function finish(outcome?: AdResult) {
+  async function finish(mock?: AdEvidence, showAd = false) {
     if (!data) return;
     await task.run(async () => {
-      let pending: PendingRound = data.pending;
-      if (outcome) {
-        pending = { ...pending, outcome };
+      let pending: PendingRound | null = await pendingRound.read(
+        profile!.user_id,
+      );
+      if (!pending || pending.action_id !== data.pending.action_id)
+        throw { code: "state_changed" };
+      const signal = lifetime.current.signal;
+      const current = await golf.action(pending.action_id);
+      let evidence =
+        terminal.current?.action === pending.action_id
+          ? terminal.current.evidence
+          : undefined;
+      if (
+        !pending.outcome &&
+        !current.ad_settled &&
+        !current.completed_round_id &&
+        showAd &&
+        !evidence
+      ) {
+        evidence =
+          mock ?? (await presentInterstitial(current.test_ads, signal));
+        terminal.current = { action: pending.action_id, evidence };
+      }
+      if (evidence) {
+        pending = { ...pending, ...evidence };
         await pendingRound.write(profile!.user_id, pending);
+        terminal.current = null;
         query.setData({ ...data, pending });
       }
-      // A recorded result survives both network failure and app restart. Never settle while merely displaying the ad test.
+      // Persist the terminal event BEFORE waiting for foreground or networking.
+      await waitUntilAdForeground(signal);
       let action = await golf.action(pending.action_id);
       if (!action.ad_settled && pending.outcome)
-        action = await golf.settle(pending.action_id, pending.outcome);
+        action = await golf.settle(
+          pending.action_id,
+          pending.outcome,
+          pending.source,
+        );
       query.setData({ pending, action });
       const result = await golf.execute(action.action_id);
       await pendingRound.clear(profile!.user_id);
@@ -495,26 +528,12 @@ export function RoundActionScreen() {
                 onPress={() => void finish()}
               />
             </Card>
-          ) : data.action.test_ads ? (
-            <Card>
-              <Txt style={{ fontWeight: "700" }}>{t("testAdTitle")}</Txt>
-              <Txt>{t("testAdBody")}</Txt>
-              <Button
-                label={t("testAdComplete")}
-                testID="ad-complete"
-                busy={task.busy}
-                onPress={() => void finish("completed")}
-              />
-              <Button
-                label={t("testAdUnavailable")}
-                testID="ad-unavailable"
-                secondary
-                disabled={task.busy}
-                onPress={() => void finish("unavailable")}
-              />
-            </Card>
           ) : (
-            <Txt>{t("ads_not_configured")}</Txt>
+            <AdAction
+              testAllowed={data.action.test_ads}
+              busy={task.busy}
+              onRun={(mock) => void finish(mock, true)}
+            />
           )}
         </>
       )}
@@ -531,6 +550,20 @@ export function RoundActionScreen() {
           ).then((yes) => {
             if (yes)
               void task.run(async () => {
+                const pending = await pendingRound.read(profile!.user_id);
+                if (pending?.outcome) {
+                  const action = await golf.action(pending.action_id);
+                  if (!action.ad_settled && !action.completed_round_id)
+                    await golf.settle(
+                      pending.action_id,
+                      pending.outcome,
+                      pending.source,
+                    );
+                  // Keep the same action/proof available via Home. Clearing it
+                  // here could force another ad after a failed execute request.
+                  router.dismissTo("/");
+                  return;
+                }
                 await pendingRound.clear(profile!.user_id);
                 router.dismissTo("/");
               });

@@ -6,6 +6,40 @@ import {
   showBanner,
   type BannerContext,
 } from "../src/data/ad-policy";
+test("all banner screens deny active-round, edit, fullscreen and unconfirmed ended state", () => {
+  for (const screen of [
+    "home",
+    "record-list",
+    "record-detail",
+    "scorecard",
+    "statistics",
+    "peoria",
+    "profile",
+    "other",
+  ] as const) {
+    assert.equal(
+      showBanner({ screen, flow: "round", roundEnded: true }),
+      false,
+    );
+    for (const flow of ["browse", "round", "record"] as const) {
+      assert.equal(
+        showBanner({ screen, flow, roundEnded: true, editing: true }),
+        false,
+      );
+      assert.equal(
+        showBanner({ screen, flow, roundEnded: true, fullscreen: true }),
+        false,
+      );
+    }
+  }
+  for (const screen of ["record-detail", "scorecard", "peoria"] as const) {
+    assert.equal(showBanner({ screen, flow: "record" }), false);
+    assert.equal(
+      showBanner({ screen, flow: "record", roundEnded: true }),
+      true,
+    );
+  }
+});
 test("banner uses navigation context: live round never, ended record view only", () => {
   assert.equal(showBanner({ screen: "home", flow: "browse" }), true);
   assert.equal(

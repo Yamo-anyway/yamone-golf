@@ -655,6 +655,63 @@ test("production rejects test ad outcomes and valid outage outcomes only settle 
     1,
   );
 });
+test("stored native-test receipt proof stays non-production after environment changes", async () => {
+  const f = await ready(),
+    v = (await sendRecord(f, f.visitor)).data.delivery,
+    a = await receiveAction(v, f.c);
+  const settled = await req(
+    "/api/receipt-actions/" + a.action_id + "/ad",
+    f.c.token,
+    { user_id: f.c.user_id, outcome: "completed", source: "admob-test" },
+  );
+  assert.equal(settled.status, 200);
+  const worker = (await import("../src/index")).default;
+  const env = {
+    DB: db as any,
+    ENVIRONMENT: "production",
+    ALLOWED_ORIGINS: "https://app.test",
+  };
+  const response = await worker.fetch(
+    new Request(
+      "https://api.test/api/receipt-actions/" + a.action_id + "/execute",
+      {
+        method: "POST",
+        headers: {
+          Authorization: "Bearer " + f.c.token,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ user_id: f.c.user_id }),
+      },
+    ),
+    env,
+  );
+  assert.equal(response.status, 503);
+  assert.equal(
+    await db
+      .prepare("SELECT 1 FROM receipts WHERE delivery_id=?")
+      .bind(v.delivery_id)
+      .first(),
+    null,
+  );
+  const read = await worker.fetch(
+    new Request("https://api.test/api/receipt-actions/" + a.action_id, {
+      headers: { Authorization: "Bearer " + f.c.token },
+    }),
+    env,
+  );
+  assert.equal(((await read.json()) as any).ad_settled, false);
+  assert.equal(
+    (
+      await db
+        .prepare(
+          "SELECT source FROM round_ad_settlements WHERE user_id=? AND round_id=?",
+        )
+        .bind(f.c.user_id, f.r.round_id)
+        .first<any>()
+    ).source,
+    "admob-test",
+  );
+});
 test("cursor lists are scoped to owner and include all records with equal timestamps without duplicates", async () => {
   const a = await user(),
     b = await user(),

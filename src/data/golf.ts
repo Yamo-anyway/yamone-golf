@@ -1,6 +1,7 @@
 import type { EndRequest, EndView } from "../../shared/round-ending";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { request } from "./api";
+import type { AdSource } from "./ad-config";
 export type Segment = { name: string; pars: number[] };
 export type Course = {
   course_id: string;
@@ -56,6 +57,7 @@ export type PendingRound = {
   action_id: string;
   input: CreateInput | JoinInput;
   outcome?: AdResult;
+  source?: AdSource;
 };
 export type RoundAction = {
   action_id: string;
@@ -129,9 +131,14 @@ export const golf = {
       ...p.input,
     }),
   action: (id: string) => request<RoundAction>("/api/round-actions/" + id),
-  settle: (id: string, outcome: AdResult) =>
+  settle: (
+    id: string,
+    outcome: AdResult,
+    source: AdSource = "development-test",
+  ) =>
     request<RoundAction>("/api/round-actions/" + id + "/ad", "POST", {
       outcome,
+      source,
     }),
   execute: (id: string) =>
     request<{ round: Round }>(

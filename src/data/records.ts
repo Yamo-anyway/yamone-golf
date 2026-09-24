@@ -19,6 +19,7 @@ export const receiveAPI: ReceiptAPI = {
     request("/api/receipt-actions/" + p.action_id + "/ad", "POST", {
       user_id: p.user_id,
       outcome,
+      source: p.source ?? "development-test",
     }),
   execute: (p) =>
     request("/api/receipt-actions/" + p.action_id + "/execute", "POST", {

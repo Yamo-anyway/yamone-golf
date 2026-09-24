@@ -142,6 +142,16 @@ export default {
   resumeRound: "이어서 처리",
   roundReview: "라운드 최종 확인",
   testAdTitle: "개발용 광고 테스트",
+  nativeAdHelp:
+    "실제 광고 SDK의 테스트 광고를 표시합니다. 광고를 닫거나 광고 로딩·노출이 실패하면 최신 상태를 확인하고 작업을 진행합니다.",
+  nativeAdContinue: "광고 확인 후 계속",
+  ad_native_build_required:
+    "광고 SDK가 포함된 새 개발 빌드가 필요합니다. Expo Go에서는 실제 광고를 표시할 수 없습니다.",
+  ad_busy: "다른 광고를 처리하고 있습니다. 잠시 후 다시 시도해 주세요.",
+  adPrivacy: "광고 개인정보 선택",
+  adPrivacyNotRequired:
+    "현재 광고 제공자가 표시할 개인정보 선택 양식이 없습니다.",
+  adBannerFixture: "개발 검증용 배너 · 실제 광고 아님",
   testAdBody:
     "실제 광고는 아직 연결하지 않았습니다. 완료 또는 광고 없음 상황을 선택해 기능 흐름을 확인합니다.",
   testAdComplete: "광고 완료로 테스트",
