@@ -1,12 +1,12 @@
 # Yamone Golf v0.3.11 — 11단계 이메일 이전·복구
 
-선택형 복구 이메일의 인증, Resend 전송 어댑터, 15분 1회용 코드, 새 기기 이전과 기존 기기 폐기, 앱 딥 링크를 구현했습니다. 이메일은 일반 로그인이나 회원가입에 사용하지 않습니다. 로컬 mock과 실제 Worker/D1 코드 검증까지이며 운영 Resend 실발송·배포·실기기 확인은 아직 별도입니다. 자세한 기준은 [docs/EMAIL_RECOVERY.md](docs/EMAIL_RECOVERY.md)를 읽으세요.
+선택형 복구 이메일의 인증, Resend 전송 어댑터, 15분 1회용 코드, 새 기기 이전과 기존 기기 폐기, 앱 딥 링크를 구현했습니다. 이메일은 일반 로그인이나 회원가입에 사용하지 않습니다. 운영 Worker/D1 배포와 Resend 실발송·서버 기기 이전 검증까지 완료했으며 Android 앱 링크와 실기기 생명주기 확인은 별도입니다. 자세한 기준은 [docs/EMAIL_RECOVERY.md](docs/EMAIL_RECOVERY.md)를 읽으세요.
 
 - 현재 활성 기기의 `내 정보`에서 복구 이메일을 인증합니다. 주소는 화면에서 마스킹되며 한 이메일은 한 `user_id`에만 연결됩니다.
 - 새 기기는 이메일 존재 여부를 드러내지 않는 요청으로 코드를 받고, 성공 시 기존 활성 기기를 폐기하고 복구 키도 교체합니다.
 - 요청 ID, 새 기기 비밀값, 다음 복구 키를 서버 요청 전에 SecureStore에 보관해 응답 유실 후 같은 요청을 재확인합니다.
 - Resend API 키와 코드 HMAC secret은 Wrangler secret으로만 주입하며 소스·앱·D1에 원문을 저장하지 않습니다.
-- `0008_email_recovery.sql`을 추가했습니다. 운영 D1 ID는 생성된 `yamone-golf` DB에 연결했지만 원격 마이그레이션과 Worker 배포는 아직 실행하지 않았습니다.
+- `0008_email_recovery.sql`을 추가했고 운영 D1에 `0001`~`0008`을 적용했습니다. Worker는 `https://yamone-golf-api.yamone-golf.workers.dev`에서 동작합니다.
 
 ## 이전 완료: 10단계 광고 SDK 개발 연결
 
@@ -42,7 +42,7 @@
 - 기존 v0.2.0 원본 ZIP을 `baseline/`에 그대로 보존했습니다. `SHA256SUMS`로 확인할 수 있습니다.
 - 앱 개발판 식별자는 `com.yamone.golf.dev`입니다. 기존 `com.yamone.golf`와 함께 설치할 수 있습니다.
 - 새 D1 사용자는 기존 Node/SQLite 서버 사용자와 별개입니다. 이전 서버 데이터를 자동 이전하지 않습니다.
-- 운영 D1은 생성되어 설정 파일에 연결했지만 마이그레이션·Worker 배포는 아직 수행하지 않았습니다.
+- 운영 D1 마이그레이션과 Worker 배포를 완료했습니다. 운영 테스트 계정은 검증 후 관련 행과 함께 삭제했습니다.
 
 ## 로컬 실행
 
@@ -99,4 +99,4 @@ npm run test:ui
 
 `yamone-golf-cloudflare/wrangler.jsonc`의 최상위 개발 DB ID는 로컬 개발용 자리표시자이고, production 항목은 생성한 운영 D1에 연결되어 있습니다. 구체적인 마이그레이션·secret·배포 순서는 `docs/CLOUDFLARE.md`를 참고하세요.
 
-Cron은 6시간 만료 라운드 종료와 요청 제한 데이터 정리를 수행하도록 연결했습니다. 실제 외부 스케줄은 배포 후에 활성화됩니다.
+Cron은 6시간 만료 라운드 종료와 요청 제한 데이터 정리를 수행하도록 운영 Worker에 `*/10 * * * *`로 배포했습니다.

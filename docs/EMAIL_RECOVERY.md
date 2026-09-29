@@ -37,6 +37,14 @@ npx wrangler secret put EMAIL_TOKEN_SECRET --env production
 
 `EMAIL_TOKEN_SECRET`은 최소 32바이트의 독립 난수여야 하며 Resend API 키와 재사용하지 않습니다. 로컬 테스트는 Miniflare binding의 mock 제공자만 사용하고 실제 메일을 발송하지 않습니다.
 
+## 운영 검증 — 2026-09-29
+
+- 운영 D1에 `0001`~`0008` 마이그레이션을 적용하고 production Worker 및 10분 Cron을 배포했습니다.
+- Wrangler secret으로 두 비밀값을 등록했으며 값은 Git·문서·명령 출력에 남기지 않았습니다.
+- 실제 Resend 인증 메일과 복구 메일을 수신하고 코드를 확인했습니다.
+- 서버 API에서 동일 `user_id`로 새 기기가 활성화되고 기존 기기는 `device_moved` 401, 새 기기는 200이 되는 것을 확인했습니다.
+- 운영 검증용 사용자와 연결된 인증·복구·기기 행은 검증 후 삭제했고 잔여 사용자 수 0을 확인했습니다.
+
 ## 아직 완료로 보지 않는 항목
 
-Resend 실발송, Android 앱 링크 복귀, 앱 강제 종료·재실행, 실제 기기 이전, 운영 Worker/D1 마이그레이션과 배포는 계정 설정 후 별도 QA가 필요합니다. 로컬 mock 테스트는 이 운영 증거를 대체하지 않습니다.
+Android 메일 앱의 링크로 앱에 복귀, 앱 강제 종료·재실행, 실제 두 Android 기기 이전은 설치 APK에서 별도 QA가 필요합니다. 서버 API 검증은 네이티브 생명주기 증거를 대체하지 않습니다.
