@@ -72,6 +72,12 @@ npm start
 
 필요하면 Worker를 `npm run dev --workspace yamone-golf-cloudflare -- --ip 0.0.0.0`으로 실행하고 같은 네트워크의 휴대폰에서 접근합니다. QR 스캔과 네트워크 상태 감지는 새 개발 빌드에서 실기기 검증이 필요합니다. Web/Android export만으로 APK·실기기 검증이 끝난 것은 아닙니다.
 
+## Android QA APK
+
+`.github/workflows/android-apk.yml`은 `develop/0.3.x`의 앱 관련 변경에서 설치용 QA APK를 만듭니다. GitHub Actions의 `Android QA APK` 실행을 열고 `yamone-golf-android-test-<run number>` artifact를 받습니다. 현재 APK는 운영 Worker에 연결되지만 Google 테스트 광고와 개발용 패키지 `com.yamone.golf.dev`를 사용하며, Play Store 제출용 서명본이 아닙니다.
+
+2026-09-29의 최초 성공 실행은 [run 36540461421](https://github.com/Yamo-anyway/yamone-golf/actions/runs/36540461421)입니다. artifact와 APK SHA-256은 `docs/VALIDATION.md`에 기록했습니다.
+
 ## 검증 명령
 
 ```bash
