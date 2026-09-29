@@ -1,4 +1,4 @@
-# API — v0.3.7
+# API — v0.3.11
 
 모든 응답은 Cache-Control: no-store입니다. 오류는 `{ "error": "code" }` 형식이며 화면 문자열은 앱의 ko/en 리소스에서 정합니다. 각 성공 응답의 profile은 비밀값과 해시를 포함하지 않습니다.
 
@@ -16,6 +16,22 @@
 복구는 기존 키를 소비하고 새 키로 교체합니다. 새 기기는 교체된 키를 별도 보관하도록 안내합니다. 키를 아는 동시 요청 2개 중 하나만 성공합니다. 복구 실패 시 기존 활성 기기는 유지됩니다.
 
 오류 예: unauthorized(401), device_moved(401), invalid_nickname(400), invalid_recovery(400), origin_denied(403), rate_limited(429), server_error(500).
+
+## 복구 이메일 API
+
+이메일은 일반 로그인 식별자가 아니며 현재 활성 기기에서 선택적으로 인증합니다. 인증이 끝난 주소만 새 기기 복구에 사용할 수 있습니다.
+
+| 메서드 | 경로                                      | 인증 | 입력 / 결과 |
+| ------ | ----------------------------------------- | ---- | ----------- |
+| GET    | /api/email-recovery                       | 필요 | configured, 마스킹 주소, verified_at |
+| POST   | /api/email-recovery/verification-requests | 필요 | request_id, email, language → 15분 코드 발송 상태 |
+| POST   | /api/email-recovery/verify                | 필요 | request_id, code → 이메일 인증 |
+| POST   | /api/email-recovery/requests              | 없음 | request_id, email, language → 주소 존재 여부와 무관하게 accepted |
+| POST   | /api/email-recovery/claim                 | 없음 | request_id, code, 새 device_secret, next_recovery_key, client → 같은 user_id의 profile |
+
+코드는 공백·하이픈을 제외하고 12자이며 15분 뒤 만료됩니다. D1에는 코드 해시만 저장합니다. 복구 요청은 등록된 주소가 아니거나 Resend 전송 장애가 있어도 같은 공개 응답을 사용합니다. 실제 복구 claim은 코드·만료·미소비 상태를 검사하며 기존 기기 폐기, 새 기기 활성화, 복구 키 교체, 요청 소비를 한 D1 batch로 처리합니다.
+
+Resend 요청은 `yamone-golf:<verify|recover>:<request_id>` 멱등 키를 사용합니다. 앱은 request_id와 새 기기 비밀값·다음 복구 키를 먼저 SecureStore에 기록하고, 응답 유실 시 동일 본문으로 재요청합니다.
 
 ## 2단계 골프장·라운드 API
 
@@ -54,7 +70,7 @@
 
 추가 오류: course_changed/list_changed/state_changed/active_round_exists/round_ended/invitation_unavailable/ad_required(409), forbidden(403), ads_not_configured(503). 오류 후 화면 초안을 임의로 지우지 않습니다.
 
-점수·종료·기록 보내기/받기 API는 아래에 이어집니다. 이메일 API는 후속 단계입니다.
+점수·종료·기록 보내기/받기 API는 아래에 이어집니다.
 
 ## 3단계 플레이어·개인 입력 대상 API
 

@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
@@ -9,7 +9,8 @@ import {
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { router, usePathname } from "expo-router";
+import { router, useLocalSearchParams, usePathname } from "expo-router";
+import * as Crypto from "expo-crypto";
 import {
   useIsFocused,
   useNavigation,
@@ -25,6 +26,24 @@ import { Button, Card, colors, Field, styles, Txt } from "./components";
 import { useErrorText, useSession } from "./session";
 import { HomeRounds } from "./rounds";
 import type { Language } from "../data/model";
+import { api, ApiError } from "../data/api";
+
+function emailErrorKey(code: string) {
+  switch (code) {
+    case "invalid_email":
+    case "email_in_use":
+    case "invalid_email_verification":
+    case "invalid_email_recovery":
+    case "email_delivery_failed":
+    case "email_not_configured":
+    case "request_expired":
+    case "request_reused":
+    case "rate_limited":
+      return code;
+    default:
+      return "emailActionFailed";
+  }
+}
 
 function PersonalQR({ value, label }: { value: string; label: string }) {
   const matrix = useMemo(
@@ -52,20 +71,46 @@ function PersonalQR({ value, label }: { value: string; label: string }) {
 }
 function Welcome() {
   const s = useSession();
-  const [restoring, setRestoring] = useState(s.startWithRecovery),
+  const [mode, setMode] = useState<"new" | "key" | "email">(
+      s.vault.emailRecovery
+        ? "email"
+        : s.startWithRecovery
+          ? "key"
+          : "new",
+    ),
     [name, setName] = useState(""),
-    [key, setKey] = useState("");
+    [key, setKey] = useState(""),
+    [email, setEmail] = useState(s.vault.emailRecovery?.email ?? ""),
+    [code, setCode] = useState(""),
+    [requestId, setRequestId] = useState(
+      s.vault.emailRecovery?.request_id ?? "",
+    ),
+    [emailSent, setEmailSent] = useState(
+      !!s.vault.emailRecovery?.sent,
+    );
   return (
     <>
       <View style={{ paddingTop: 28, paddingBottom: 12, gap: 16 }}>
         <Txt style={styles.title}>
-          {s.t(restoring ? "recovery" : "welcome")}
+          {s.t(
+            mode === "key"
+              ? "recovery"
+              : mode === "email"
+                ? "emailRecovery"
+                : "welcome",
+          )}
         </Txt>
         <Txt style={{ color: colors.muted }}>
-          {s.t(restoring ? "recoveryHelp" : "intro")}
+          {s.t(
+            mode === "key"
+              ? "recoveryHelp"
+              : mode === "email"
+                ? "emailRecoveryHelp"
+                : "intro",
+          )}
         </Txt>
       </View>
-      {restoring ? (
+      {mode === "key" ? (
         <>
           <Field
             label={s.t("recoveryKey")}
@@ -84,6 +129,69 @@ function Welcome() {
             busy={s.busy}
             onPress={() => void s.recover(key)}
           />
+        </>
+      ) : mode === "email" ? (
+        <>
+          {!emailSent ? (
+            <>
+              <Field
+                label={s.t("recoveryEmail")}
+                testID="recovery-email"
+                value={email}
+                onChangeText={setEmail}
+                autoCapitalize="none"
+                autoCorrect={false}
+                keyboardType="email-address"
+                editable={!s.busy}
+              />
+              <Button
+                label={s.t("sendRecoveryCode")}
+                testID="send-email-recovery"
+                disabled={!email.trim()}
+                busy={s.busy}
+                onPress={async () => {
+                  const result = await s.requestEmailRecovery(email);
+                  if (result) {
+                    setRequestId(result.request_id);
+                    setEmailSent(true);
+                    if (result.test_code) setCode(result.test_code);
+                  }
+                }}
+              />
+            </>
+          ) : (
+            <>
+              <Txt style={{ color: colors.muted }}>{s.t("emailCodeSent")}</Txt>
+              <Field
+                label={s.t("emailCode")}
+                testID="email-recovery-code"
+                value={code}
+                onChangeText={setCode}
+                autoCapitalize="characters"
+                autoCorrect={false}
+                maxLength={20}
+                editable={!s.busy}
+              />
+              <Button
+                label={s.t("recover")}
+                testID="recover-by-email"
+                disabled={!requestId || !code.trim()}
+                busy={s.busy}
+                onPress={() => void s.recoverByEmail(requestId, code)}
+              />
+              <Button
+                label={s.t("requestNewCode")}
+                secondary
+                disabled={s.busy}
+                onPress={async () => {
+                  await s.cancelEmailRecovery();
+                  setEmailSent(false);
+                  setRequestId("");
+                  setCode("");
+                }}
+              />
+            </>
+          )}
         </>
       ) : (
         <>
@@ -113,13 +221,189 @@ function Welcome() {
           />
         </>
       )}
-      <Button
-        label={s.t(restoring ? "back" : "restore")}
-        secondary
-        disabled={s.busy}
-        onPress={() => setRestoring(!restoring)}
-      />
+      {mode === "new" ? (
+        <>
+          <Button
+            label={s.t("restore")}
+            secondary
+            disabled={s.busy}
+            onPress={() => setMode("key")}
+          />
+          <Button
+            label={s.t("recoverWithEmail")}
+            secondary
+            disabled={s.busy}
+            onPress={() => setMode("email")}
+          />
+        </>
+      ) : (
+        <Button
+          label={s.t("back")}
+          secondary
+          disabled={s.busy}
+          onPress={() => {
+            if (mode === "email") void s.cancelEmailRecovery();
+            setMode("new");
+            setEmailSent(false);
+            setRequestId("");
+            setCode("");
+          }}
+        />
+      )}
     </>
+  );
+}
+
+function RecoveryEmailCard() {
+  const s = useSession();
+  const [configured, setConfigured] = useState<boolean | null>(null),
+    [hint, setHint] = useState<string | null>(null),
+    [editing, setEditing] = useState(false),
+    [email, setEmail] = useState(""),
+    [requestId, setRequestId] = useState(""),
+    [code, setCode] = useState(""),
+    [busy, setBusy] = useState(false),
+    [notice, setNotice] = useState("");
+  useEffect(() => {
+    let active = true;
+    void api
+      .emailRecoveryStatus()
+      .then((result) => {
+        if (!active) return;
+        setConfigured(result.configured);
+        setHint(result.email_hint);
+      })
+      .catch(() => {
+        if (active) setConfigured(false);
+      });
+    return () => {
+      active = false;
+    };
+  }, []);
+  if (configured === null)
+    return (
+      <Card>
+        <ActivityIndicator color={colors.green} />
+      </Card>
+    );
+  return (
+    <Card>
+      <Txt style={{ fontSize: 20, lineHeight: 28, fontWeight: "700" }}>
+        {s.t("recoveryEmailTitle")}
+      </Txt>
+      <Txt style={{ color: colors.muted }}>{s.t("recoveryEmailHelp")}</Txt>
+      {!configured ? (
+        <Txt>{s.t("email_not_configured")}</Txt>
+      ) : hint && !editing ? (
+        <>
+          <Txt testID="recovery-email-hint">{hint}</Txt>
+          <Txt>{s.t("emailVerified")}</Txt>
+          <Button
+            label={s.t("changeRecoveryEmail")}
+            secondary
+            onPress={() => setEditing(true)}
+          />
+        </>
+      ) : requestId ? (
+        <>
+          <Txt>{s.t("emailCodeSent")}</Txt>
+          <Field
+            label={s.t("emailCode")}
+            testID="verify-email-code"
+            value={code}
+            onChangeText={setCode}
+            autoCapitalize="characters"
+            autoCorrect={false}
+            maxLength={20}
+            editable={!busy}
+          />
+          <Button
+            label={s.t("verifyEmail")}
+            testID="verify-recovery-email"
+            disabled={!code.trim()}
+            busy={busy}
+            onPress={async () => {
+              setBusy(true);
+              setNotice("");
+              try {
+                const result = await api.verifyRecoveryEmail({
+                  request_id: requestId,
+                  code,
+                });
+                setHint(result.email_hint);
+                setRequestId("");
+                setEditing(false);
+                setNotice(s.t("emailVerified"));
+              } catch (error) {
+                setNotice(
+                  s.t(
+                    emailErrorKey(
+                      error instanceof ApiError ? error.code : "network",
+                    ),
+                  ),
+                );
+              } finally {
+                setBusy(false);
+              }
+            }}
+          />
+          <Button
+            label={s.t("requestNewCode")}
+            secondary
+            disabled={busy}
+            onPress={() => {
+              setRequestId("");
+              setCode("");
+              setNotice("");
+            }}
+          />
+        </>
+      ) : (
+        <>
+          <Field
+            label={s.t("recoveryEmail")}
+            testID="profile-recovery-email"
+            value={email}
+            onChangeText={setEmail}
+            autoCapitalize="none"
+            autoCorrect={false}
+            keyboardType="email-address"
+            editable={!busy}
+          />
+          <Button
+            label={s.t("sendVerificationCode")}
+            testID="send-email-verification"
+            disabled={!email.trim()}
+            busy={busy}
+            onPress={async () => {
+              setBusy(true);
+              setNotice("");
+              try {
+                const id = Crypto.randomUUID();
+                const result = await api.requestEmailVerification({
+                  request_id: id,
+                  email,
+                  language: s.lang,
+                });
+                setRequestId(id);
+                if (result.test_code) setCode(result.test_code);
+              } catch (error) {
+                setNotice(
+                  s.t(
+                    emailErrorKey(
+                      error instanceof ApiError ? error.code : "network",
+                    ),
+                  ),
+                );
+              } finally {
+                setBusy(false);
+              }
+            }}
+          />
+        </>
+      )}
+      {!!notice && <Txt accessibilityLiveRegion="polite">{notice}</Txt>}
+    </Card>
   );
 }
 function BackupKey() {
@@ -301,6 +585,7 @@ export function ProfileScreen() {
           {s.t("languageHint")}
         </Txt>
       </Card>
+      <RecoveryEmailCard />
       <AdPrivacy />
     </>
   );
@@ -370,7 +655,88 @@ function Gate({ children }: { children: React.ReactNode }) {
     </>
   );
 }
-export function Shell({ children }: { children: React.ReactNode }) {
+export function EmailRecoveryLinkScreen() {
+  const s = useSession();
+  const params = useLocalSearchParams<{
+    kind?: string;
+    request_id?: string;
+    code?: string;
+  }>();
+  const kind = params.kind,
+    requestId = params.request_id,
+    code = params.code;
+  const [busy, setBusy] = useState(false),
+    [done, setDone] = useState(false),
+    [notice, setNotice] = useState("");
+  const valid =
+    (kind === "verify" || kind === "recover") && !!requestId && !!code;
+  return (
+    <>
+      <Txt style={styles.title}>{s.t("emailLinkTitle")}</Txt>
+      {!valid ? (
+        <Txt>{s.t("invalidEmailLink")}</Txt>
+      ) : done ? (
+        <>
+          <Txt>{s.t(kind === "verify" ? "emailVerified" : "emailRecovered")}</Txt>
+          <Button
+            label={s.t("continueHome")}
+            onPress={() => router.dismissTo("/")}
+          />
+        </>
+      ) : kind === "verify" && s.phase !== "ready" ? (
+        <Txt>{s.t("emailVerificationDeviceRequired")}</Txt>
+      ) : (
+        <>
+          <Txt>
+            {s.t(
+              kind === "verify"
+                ? "confirmEmailVerification"
+                : "confirmEmailRecovery",
+            )}
+          </Txt>
+          <Button
+            label={s.t(kind === "verify" ? "verifyEmail" : "recover")}
+            busy={busy || s.busy}
+            onPress={async () => {
+              setBusy(true);
+              setNotice("");
+              try {
+                if (kind === "verify") {
+                  await api.verifyRecoveryEmail({
+                    request_id: requestId!,
+                    code: code!,
+                  });
+                  setDone(true);
+                } else if (await s.recoverByEmail(requestId!, code!)) {
+                  setDone(true);
+                }
+              } catch (error) {
+                setNotice(
+                  s.t(
+                    emailErrorKey(
+                      error instanceof ApiError ? error.code : "network",
+                    ),
+                  ),
+                );
+              } finally {
+                setBusy(false);
+              }
+            }}
+          />
+          {!!notice && <Txt accessibilityRole="alert">{notice}</Txt>}
+        </>
+      )}
+    </>
+  );
+}
+
+export function Shell({
+  children,
+  publicScreen = false,
+}: {
+  children: React.ReactNode;
+  publicScreen?: boolean;
+}) {
   const [detailBanner, setDetailBanner] = useState<BannerContext | null>(null);
   const focused = useIsFocused();
   const s = useSession(),
@@ -438,7 +804,7 @@ export function Shell({ children }: { children: React.ReactNode }) {
                 {s.t("offlineSession")}
               </Txt>
             )}
-            <Gate>{children}</Gate>
+            {publicScreen ? children : <Gate>{children}</Gate>}
           </ScrollView>
           {bannerAllowed && <AdBanner />}
           {s.phase === "ready" && (

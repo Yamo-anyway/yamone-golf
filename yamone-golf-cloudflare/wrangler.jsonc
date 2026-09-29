@@ -6,7 +6,10 @@
   "workers_dev": true,
   "vars": {
     "ENVIRONMENT": "development",
-    "ALLOWED_ORIGINS": "http://localhost:8081,http://127.0.0.1:8081,http://localhost:4173,http://127.0.0.1:4173"
+    "ALLOWED_ORIGINS": "http://localhost:8081,http://127.0.0.1:8081,http://localhost:4173,http://127.0.0.1:4173",
+    "EMAIL_MODE": "disabled",
+    "EMAIL_FROM": "Yamone Golf <noreply@golf.yamone.net>",
+    "EMAIL_APP_LINK": "yamone-golf:///email-recovery"
   },
   "d1_databases": [{
     "binding": "DB",
@@ -18,10 +21,16 @@
   "env": {
     "production": {
       "name": "yamone-golf-api",
-      "vars": { "ENVIRONMENT": "production", "ALLOWED_ORIGINS": "" },
+      "vars": {
+        "ENVIRONMENT": "production",
+        "ALLOWED_ORIGINS": "",
+        "EMAIL_MODE": "resend",
+        "EMAIL_FROM": "Yamone Golf <noreply@golf.yamone.net>",
+        "EMAIL_APP_LINK": "yamone-golf:///email-recovery"
+      },
       "d1_databases": [{
         "binding": "DB", "database_name": "yamone-golf",
-        "database_id": "00000000-0000-0000-0000-000000000000",
+        "database_id": "c4bfbdea-d475-4415-aa9e-5ba3806cb552",
         "migrations_dir": "migrations"
       }],
       "triggers": { "crons": ["*/10 * * * *"] }

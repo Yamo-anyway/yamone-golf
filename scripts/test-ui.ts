@@ -28,6 +28,7 @@ async function main() {
       ? requested
       : [
           "tests/identity-ui.ts",
+          "tests/email-ui.ts",
           "tests/rounds-ui.ts",
           "tests/players-ui.ts",
           "tests/scores-ui.ts",

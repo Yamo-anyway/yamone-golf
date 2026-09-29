@@ -2,6 +2,11 @@ export interface Env {
   DB: D1Database;
   ENVIRONMENT: string;
   ALLOWED_ORIGINS: string;
+  EMAIL_MODE?: "mock" | "resend" | "disabled";
+  EMAIL_FROM?: string;
+  EMAIL_APP_LINK?: string;
+  RESEND_API_KEY?: string;
+  EMAIL_TOKEN_SECRET?: string;
 }
 export type User = {
   user_id: string;

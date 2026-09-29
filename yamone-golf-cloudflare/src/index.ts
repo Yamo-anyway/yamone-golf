@@ -1,6 +1,5 @@
 import {
   type Env,
-  type User,
   ApiError,
   json,
   now,
@@ -19,40 +18,9 @@ import {
 } from "./shared";
 import { expireRounds } from "./round-store";
 import { golfRoute } from "./golf";
+import { emailRecoveryRoute } from "./email-recovery";
+import { identityResponse, profile } from "./identity-response";
 export type { Env } from "./shared";
-async function profile(env: Env, userId: string) {
-  const p = await env.DB.prepare(
-    "SELECT user_id,nickname,personal_code,language,created_at,updated_at FROM users WHERE user_id=?",
-  )
-    .bind(userId)
-    .first<User>();
-  if (!p) throw new ApiError("unauthorized", 401);
-  return { ...p, personal_qr: `yamone-golf://player/${p.personal_code}` };
-}
-async function identityResponse(
-  request: Request,
-  env: Env,
-  token: string,
-  client: unknown,
-  status = 200,
-) {
-  const d = await device(env, token);
-  assertActive(d);
-  const response = json(
-    { profile: await profile(env, d.user_id), server_time: now() },
-    status,
-  );
-  if (client === "web") {
-    if (!request.headers.get("Origin"))
-      throw new ApiError("origin_required", 403);
-    const secure = new URL(request.url).protocol === "https:" ? "; Secure" : "";
-    response.headers.set(
-      "Set-Cookie",
-      `${cookieName}=${token}; Path=/; HttpOnly; SameSite=Lax; Max-Age=31536000${secure}`,
-    );
-  }
-  return response;
-}
 async function register(request: Request, env: Env) {
   const b = await body(request);
   const token = secret(b.device_secret);
@@ -145,7 +113,7 @@ async function route(request: Request, env: Env) {
     await env.DB.prepare("SELECT 1 AS ok").first();
     return json({
       status: "ok",
-      version: "0.3.7",
+      version: "0.3.11",
       environment: env.ENVIRONMENT,
       server_time: now(),
     });
@@ -154,6 +122,8 @@ async function route(request: Request, env: Env) {
     return register(request, env);
   if (path === "/api/recovery/claim" && request.method === "POST")
     return claim(request, env);
+  const email = await emailRecoveryRoute(request, env);
+  if (email) return email;
   if (path === "/api/me" && ["GET", "PATCH"].includes(request.method)) {
     const d = await authenticate(request, env);
     if (request.method === "PATCH") {
@@ -242,8 +212,19 @@ export default {
   },
   async scheduled(_event: ScheduledController, env: Env) {
     await expireRounds(env);
-    await env.DB.prepare("DELETE FROM request_limits WHERE expires_at < ?")
-      .bind(now())
-      .run();
+    const cutoff = now() - 7 * 24 * 60 * 60 * 1000;
+    await env.DB.batch([
+      env.DB
+        .prepare("DELETE FROM request_limits WHERE expires_at < ?")
+        .bind(now()),
+      env.DB
+        .prepare("DELETE FROM email_verification_requests WHERE created_at < ?")
+        .bind(cutoff),
+      env.DB
+        .prepare(
+          "DELETE FROM email_recovery_requests WHERE created_at < ?",
+        )
+        .bind(now() - 30 * 24 * 60 * 60 * 1000),
+    ]);
   },
 } satisfies ExportedHandler<Env>;

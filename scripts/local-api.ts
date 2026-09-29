@@ -24,6 +24,10 @@ async function main() {
       bindings: {
         ENVIRONMENT: "ui-test",
         ALLOWED_ORIGINS: `http://localhost:${previewPort},http://127.0.0.1:${previewPort}`,
+        EMAIL_MODE: "mock",
+        EMAIL_FROM: "Yamone Golf <noreply@golf.yamone.net>",
+        EMAIL_APP_LINK: "yamone-golf:///email-recovery",
+        EMAIL_TOKEN_SECRET: "ui-test-email-token-secret-32-bytes-minimum",
       },
     }),
   );
