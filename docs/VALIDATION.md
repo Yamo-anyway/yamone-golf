@@ -1,3 +1,17 @@
+# 12단계 Android QA APK — v0.3.11 / 2026-09-29
+
+- GitHub Actions `Android QA APK` [run 36540461421](https://github.com/Yamo-anyway/yamone-golf/actions/runs/36540461421)이 commit `2af95501ca2574e8b61f9dc23f925c79543d0ec2`에서 성공했습니다.
+- Ubuntu runner에서 Node 24, Temurin 17, Android SDK/Build Tools 36과 NDK `27.1.12297006`을 준비한 뒤 lint, TypeScript, 자동 테스트 161개, Expo Android prebuild와 Gradle `:app:assembleRelease`를 통과했습니다.
+- APK `yamone-golf-v0.3.11-android-test.apk`는 135,399,992 bytes이며 SHA-256은 `5bb4db3024a0dc5c00028bf92d7a311cd4a0210293df8677218025fc5bd86241`입니다. ZIP 구조와 APK 자체 압축 구조, 포함된 체크섬 및 APK Signature Scheme v2 서명(서명자 1명)을 확인했습니다.
+- GitHub artifact `yamone-golf-android-test-3`은 64,200,140 bytes, SHA-256 `26aaef028068e3397e598a25b8be4bac3d7fee37d503e154cfa81571f583ede8`이며 2026-10-13까지 보관됩니다.
+- 번들에 운영 API `https://yamone-golf-api.yamone-golf.workers.dev`와 `admob-test` 모드가 포함된 것을 확인했습니다. 이는 설치 가능한 **QA APK**이며 Play Store 운영 서명·운영 광고·실기기 기능 검증을 완료했다는 뜻은 아닙니다.
+
+## 아직 필요한 실기기 검증
+
+Android 휴대폰 설치, 최초 실행/권한, QR, 이메일 앱 링크 복귀, 기기 이전, 네트워크 단절·강제 종료·재부팅, 광고 표시/중단/실패, 배너 안전영역을 실제 기기에서 확인해야 합니다. 운영 AdMob ID·UMP와 Play App Signing도 별도입니다.
+
+---
+
 # 11단계 로컬 구현 검증 — v0.3.11-stage11a / 2026-09-29
 
 ## 이번 실행 결과

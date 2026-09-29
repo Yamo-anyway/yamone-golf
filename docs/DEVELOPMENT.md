@@ -100,6 +100,12 @@ Miniflare mock과 브라우저 UI에서 이메일 인증, 주소 마스킹, 잘�
 | ---- | ------------------------------------------------------------------------ |
 | 12   | Android APK 운영 API 연결, 실기기 이메일 링크·강제 종료·광고·안전영역 QA |
 
+## 진행 중: 12단계 Android QA
+
+GitHub Actions에서 운영 Worker URL과 Google 테스트 광고 모드를 주입해 `com.yamone.golf.dev` 설치용 Release APK를 생성했습니다. lint/typecheck/자동 테스트, Expo prebuild, Gradle 빌드, APK 압축 구조와 v2 서명 검증을 모두 workflow에 포함했습니다. 첫 성공 실행과 체크섬은 VALIDATION.md에 기록했습니다.
+
+APK 생성은 완료했지만 휴대폰 설치·앱 링크·강제 종료·QR·광고 및 안전영역은 아직 실기기에서 확인하지 않았습니다. 이 APK는 QA용 debug key 서명이며 Play Store 제출용 운영 서명본이 아닙니다.
+
 `development`/`test`/`ui-test` 환경만 테스트 완료를 받으며, `production` 및 그 외 환경은 `ads_not_configured`로 거절합니다. 생성 광고는 action에 저장하고 생성 성공과 함께 라운드 이력을 등록합니다. 참여·수신은 이미 정해진 라운드의 광고 이력을 먼저 보관하고 실제 기능 요청 시 상태를 재검사합니다. 운영 설정이 없다는 이유로 서버 제한을 제거하지 않습니다.
 
 최신 광고 기준은 POLICY.md를 사용합니다. 예전 v0.2 문서의 ‘생성/참여/종료/받기 각각 광고’ 및 ‘4초 polling’은 새 구현의 확정 기준이 아닙니다.
