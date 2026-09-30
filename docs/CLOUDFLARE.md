@@ -2,7 +2,7 @@
 
 이번 소스는 로컬 Worker와 D1에서 검증했습니다. 운영 D1 `yamone-golf`는 생성되어 production 설정에 ID가 연결됐지만, 원격 마이그레이션과 Worker 배포는 아직 수행하지 않았습니다. 개발 DB와 운영 DB는 분리합니다.
 
-v0.3.11은 `0008_email_recovery.sql`까지 사용합니다. 기존 개발 DB에는 `npm run db:local`로 추가 마이그레이션을 적용합니다. 운영 광고와 실기기 QA가 아직 없으므로 현재 버전은 운영 출시 완료가 아닙니다.
+v0.3.12는 `0009_course_catalog_admin.sql`까지 사용합니다. 기존 개발 DB에는 `npm run db:local`로 추가 마이그레이션을 적용합니다. 운영 DB에는 현재 `0008`까지만 적용되어 있으며, 아래 관리자 secret을 먼저 준비한 뒤 `0009`와 새 Worker를 적용합니다. 운영 광고와 실기기 QA가 아직 없으므로 현재 버전은 운영 출시 완료가 아닙니다.
 
 ## 개발 서버 만들기
 
@@ -43,6 +43,16 @@ npx wrangler secret put EMAIL_TOKEN_SECRET --env production
 
 `RESEND_API_KEY`에는 Resend에서 만든 `golf.yamone.net` 발송 제한 키를 붙여 넣습니다. `EMAIL_TOKEN_SECRET`은 별도로 생성한 최소 32바이트 난수이며 API 키와 재사용하지 않습니다. 메일 발신자는 `noreply@golf.yamone.net`, 앱 링크는 `yamone-golf:///email-recovery`입니다. 실제 키 값은 명령 출력·스크린샷·문서에 남기지 않습니다.
 
+골프장 관리자용 토큰도 다른 secret과 재사용하지 않는 최소 32바이트 난수로 등록합니다.
+
+```bash
+openssl rand -hex 32 | npx wrangler secret put COURSE_ADMIN_TOKEN --env production
+npx wrangler d1 migrations apply DB --remote --env production
+npx wrangler deploy --env production
+```
+
+배포 후 `https://yamone-golf-api.yamone-golf.workers.dev/admin`에서 토큰으로 로그인합니다. 토큰은 URL·Git·문서에 넣지 않습니다. 관리자 웹은 토큰을 `sessionStorage`에만 두므로 탭을 닫으면 다시 입력해야 합니다. GolfCore 연동은 별도 API 키가 없으며, 공식 JSON API만 호출하고 각 코스의 출처 URL을 D1과 앱에 보존합니다.
+
 Cron은 개발·운영 설정 모두 10분 간격으로 6시간 만료 라운드를 종료하고 요청 제한 버킷을 정리합니다. 종료 시각은 마지막 변경 +6시간으로 기록합니다. 실제 스케줄 실행은 배포 후에만 활성화되며, 로컬 검증에서는 scheduled 핸들러를 직접 호출했습니다. API도 만료를 검사하므로 Cron 실행 전후의 늦은 입력으로 만료 기한을 늘리지 못합니다.
 
 ## 앱/웹 인증
@@ -65,6 +75,8 @@ Cron은 개발·운영 설정 모두 10분 간격으로 6시간 만료 라운드
 - [Expo SDK 57 Crypto](https://docs.expo.dev/versions/v57.0.0/sdk/crypto/)
 - [Expo SDK 57 Localization](https://docs.expo.dev/versions/v57.0.0/sdk/localization/)
 - [Expo SDK 57 Router](https://docs.expo.dev/versions/v57.0.0/sdk/router/)
+- [GolfCore 공식 OpenAPI](https://www.golfcore.org/openapi.json)
+- [GolfCore API 이용 조건](https://www.golfcore.org/terms/)
 
 공용 골프장 순서와 개인 즐겨찾기는 분리되어 있습니다. 공용 courses에는 favorite 속성이 없고, user_courses의 관계와 sort_order만 바뀝니다. 라운드 골프장 데이터는 생성 준비 시 별도 복사본을 저장합니다.
 

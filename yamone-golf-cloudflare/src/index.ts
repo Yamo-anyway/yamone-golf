@@ -20,6 +20,7 @@ import { expireRounds } from "./round-store";
 import { golfRoute } from "./golf";
 import { emailRecoveryRoute } from "./email-recovery";
 import { identityResponse, profile } from "./identity-response";
+import { courseAdminRoute } from "./course-admin";
 export type { Env } from "./shared";
 async function register(request: Request, env: Env) {
   const b = await body(request);
@@ -109,11 +110,13 @@ async function claim(request: Request, env: Env) {
 }
 async function route(request: Request, env: Env) {
   const path = new URL(request.url).pathname;
+  const admin = await courseAdminRoute(request, env);
+  if (admin) return admin;
   if (path === "/health" && request.method === "GET") {
     await env.DB.prepare("SELECT 1 AS ok").first();
     return json({
       status: "ok",
-      version: "0.3.11",
+      version: "0.3.12",
       environment: env.ENVIRONMENT,
       server_time: now(),
     });
@@ -214,17 +217,15 @@ export default {
     await expireRounds(env);
     const cutoff = now() - 7 * 24 * 60 * 60 * 1000;
     await env.DB.batch([
-      env.DB
-        .prepare("DELETE FROM request_limits WHERE expires_at < ?")
-        .bind(now()),
-      env.DB
-        .prepare("DELETE FROM email_verification_requests WHERE created_at < ?")
-        .bind(cutoff),
-      env.DB
-        .prepare(
-          "DELETE FROM email_recovery_requests WHERE created_at < ?",
-        )
-        .bind(now() - 30 * 24 * 60 * 60 * 1000),
+      env.DB.prepare("DELETE FROM request_limits WHERE expires_at < ?").bind(
+        now(),
+      ),
+      env.DB.prepare(
+        "DELETE FROM email_verification_requests WHERE created_at < ?",
+      ).bind(cutoff),
+      env.DB.prepare(
+        "DELETE FROM email_recovery_requests WHERE created_at < ?",
+      ).bind(now() - 30 * 24 * 60 * 60 * 1000),
     ]);
   },
 } satisfies ExportedHandler<Env>;

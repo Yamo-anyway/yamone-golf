@@ -1,4 +1,20 @@
-# API — v0.3.11
+# API — v0.3.12
+
+## 골프장 관리자 API
+
+`GET /admin`은 같은 Worker에서 관리자 웹을 제공합니다. `/admin/api/*`는 32자 이상 `COURSE_ADMIN_TOKEN`을 Bearer로 요구하고 요청 제한을 적용합니다. 운영 토큰은 Wrangler secret에만 저장합니다.
+
+| 메서드  | 경로                                             | 용도                                      |
+| ------- | ------------------------------------------------ | ----------------------------------------- |
+| GET     | `/admin/api/courses?q=&country=&status=&offset=` | 저장된 코스 조회                          |
+| POST    | `/admin/api/courses`                             | 이름·KR/PH·도시·9홀 PAR 직접 등록         |
+| GET/PUT | `/admin/api/courses/:id`                         | 상세 조회·version 기반 전체 수정/비활성화 |
+| GET     | `/admin/api/courses/:id/history`                 | 관리자 변경 이력                          |
+| GET     | `/admin/api/golfcore/search?country=kr           | ph&q=&offset=`                            | GolfCore scorecard 검색 |
+| GET     | `/admin/api/golfcore/courses/:slug`              | 9홀 단위 검토 초안 생성                   |
+| POST    | `/admin/api/golfcore/import`                     | 검토·수정한 초안을 D1에 신규 저장/갱신    |
+
+GolfCore 호출은 공식 `https://api.golfcore.org/v1` JSON API만 사용합니다. 같은 slug는 하나의 D1 코스에만 대응하며 `source_url`을 보존합니다. 지도 좌표·이미지는 저장하지 않습니다.
 
 모든 응답은 Cache-Control: no-store입니다. 오류는 `{ "error": "code" }` 형식이며 화면 문자열은 앱의 ko/en 리소스에서 정합니다. 각 성공 응답의 profile은 비밀값과 해시를 포함하지 않습니다.
 
@@ -21,12 +37,12 @@
 
 이메일은 일반 로그인 식별자가 아니며 현재 활성 기기에서 선택적으로 인증합니다. 인증이 끝난 주소만 새 기기 복구에 사용할 수 있습니다.
 
-| 메서드 | 경로                                      | 인증 | 입력 / 결과 |
-| ------ | ----------------------------------------- | ---- | ----------- |
-| GET    | /api/email-recovery                       | 필요 | configured, 마스킹 주소, verified_at |
-| POST   | /api/email-recovery/verification-requests | 필요 | request_id, email, language → 15분 코드 발송 상태 |
-| POST   | /api/email-recovery/verify                | 필요 | request_id, code → 이메일 인증 |
-| POST   | /api/email-recovery/requests              | 없음 | request_id, email, language → 주소 존재 여부와 무관하게 accepted |
+| 메서드 | 경로                                      | 인증 | 입력 / 결과                                                                            |
+| ------ | ----------------------------------------- | ---- | -------------------------------------------------------------------------------------- |
+| GET    | /api/email-recovery                       | 필요 | configured, 마스킹 주소, verified_at                                                   |
+| POST   | /api/email-recovery/verification-requests | 필요 | request_id, email, language → 15분 코드 발송 상태                                      |
+| POST   | /api/email-recovery/verify                | 필요 | request_id, code → 이메일 인증                                                         |
+| POST   | /api/email-recovery/requests              | 없음 | request_id, email, language → 주소 존재 여부와 무관하게 accepted                       |
 | POST   | /api/email-recovery/claim                 | 없음 | request_id, code, 새 device_secret, next_recovery_key, client → 같은 user_id의 profile |
 
 코드는 공백·하이픈을 제외하고 12자이며 15분 뒤 만료됩니다. D1에는 코드 해시만 저장합니다. 복구 요청은 등록된 주소가 아니거나 Resend 전송 장애가 있어도 같은 공개 응답을 사용합니다. 실제 복구 claim은 코드·만료·미소비 상태를 검사하며 기존 기기 폐기, 새 기기 활성화, 복구 키 교체, 요청 소비를 한 D1 batch로 처리합니다.
@@ -39,7 +55,7 @@ Resend 요청은 `yamone-golf:<verify|recover>:<request_id>` 멱등 키를 사�
 
 | 메서드    | 경로                           | 입력 / 결과                                                         |
 | --------- | ------------------------------ | ------------------------------------------------------------------- |
-| GET       | /api/courses?q=&offset=0       | 이름/지역 검색, 30개씩, next_offset                                 |
+| GET       | /api/courses?q=&offset=0       | 활성 코스의 이름/도시/지역 검색, 국가·출처 링크 포함, 30개씩        |
 | POST      | /api/courses                   | course_id(UUID), name, region, segments[{name, pars[9]}]            |
 | GET/PATCH | /api/courses/:id               | 조회 / 전체 정보 + 기존 version으로 수정                            |
 | GET       | /api/me/courses                | 개인 목록 courses와 version                                         |

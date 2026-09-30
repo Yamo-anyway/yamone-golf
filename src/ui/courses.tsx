@@ -1,6 +1,6 @@
 import { DragRow } from "./drag-row";
 import React, { useRef, useState } from "react";
-import { Pressable, View } from "react-native";
+import { Linking, Pressable, View } from "react-native";
 import { router, useLocalSearchParams } from "expo-router";
 import * as Crypto from "expo-crypto";
 import { golf, type Course } from "../data/golf";
@@ -27,6 +27,25 @@ export function Heading({ title }: { title: string }) {
       />
       <Txt style={styles.title}>{title}</Txt>
     </View>
+  );
+}
+function CourseSource({ course }: { course: Course }) {
+  const { t } = useSession();
+  const url = course.source_url;
+  if (
+    course.source_name !== "golfcore" ||
+    !url?.startsWith("https://www.golfcore.org/courses/")
+  )
+    return null;
+  return (
+    <Pressable
+      accessibilityRole="link"
+      onPress={() => void Linking.openURL(url)}
+    >
+      <Txt style={{ color: colors.muted, textDecorationLine: "underline" }}>
+        {t("courseDataSource")}: GolfCore ↗
+      </Txt>
+    </Pressable>
   );
 }
 export function CoursesScreen() {
@@ -89,9 +108,20 @@ export function CoursesScreen() {
           {c.name}
         </Txt>
         <Txt style={{ color: colors.muted }}>
-          {c.region} · {c.segments.length * 9}
+          {[
+            c.city || c.region,
+            c.country_code === "KR"
+              ? t("countryKorea")
+              : c.country_code === "PH"
+                ? t("countryPhilippines")
+                : "",
+          ]
+            .filter(Boolean)
+            .join(", ")}{" "}
+          · {c.segments.length * 9}
           {t("hole")} · {c.segments.map((s) => s.name).join(" / ")}
         </Txt>
+        <CourseSource course={c} />
         {select === "1" && (
           <Button
             label={t("chooseCourse")}
@@ -104,16 +134,18 @@ export function CoursesScreen() {
             }
           />
         )}
-        <Button
-          label={t("editCourse")}
-          secondary
-          onPress={() =>
-            router.push({
-              pathname: "/course-edit",
-              params: { id: c.course_id },
-            })
-          }
-        />
+        {!c.managed_by_admin && (
+          <Button
+            label={t("editCourse")}
+            secondary
+            onPress={() =>
+              router.push({
+                pathname: "/course-edit",
+                params: { id: c.course_id },
+              })
+            }
+          />
+        )}
         {publicMode ? (
           <Button
             label={inMine ? t("myCourses") : t("addMine")}
@@ -295,6 +327,7 @@ export function CourseEditor() {
     <>
       <Heading title={t(id ? "editCourse" : "newCourse")} />
       <Txt style={{ color: colors.muted }}>{t("sharedHelp")}</Txt>
+      <CourseSource course={current} />
       <Problem text={task.errorText || loaded.errorText} />
       {id && !loaded.data ? (
         <Button label={t("retry")} onPress={() => void loaded.reload()} />

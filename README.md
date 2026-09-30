@@ -1,4 +1,14 @@
-# Yamone Golf v0.3.11 — 11단계 이메일 이전·복구
+# Yamone Golf v0.3.12 — 골프장 데이터 관리자
+
+Cloudflare Worker의 `/admin`에 운영자 전용 골프장 관리 웹을 추가했습니다. 한국·필리핀의 GolfCore 스코어카드를 검색해 검토한 뒤 가져오거나, 골프장 이름·국가·도시·9홀 코스별 PAR를 직접 등록·수정·비활성화할 수 있습니다. 변경 이력과 원본 GolfCore 링크를 보존하며 지도·이미지는 저장하지 않습니다.
+
+- 관리자 API는 Wrangler secret `COURSE_ADMIN_TOKEN`으로만 열리고 토큰은 브라우저 탭의 `sessionStorage`에만 보관합니다.
+- `0009_course_catalog_admin.sql`은 국가·도시·출처·활성 상태와 관리자 변경 이력을 추가합니다. 삭제 대신 비활성화하며 기존 라운드 Snapshot은 바뀌지 않습니다.
+- GolfCore 공개 API만 사용하고 HTML을 수집하지 않습니다. 가져오기 전 이름·도시·PAR를 수정할 수 있고 같은 원본 코스의 중복 행을 만들지 않습니다.
+- 앱은 관리자 코스를 일반 사용자가 수정하지 못하게 하고, GolfCore에서 가져온 코스에 출처 링크를 표시합니다.
+- 현재 소스 구현과 로컬 검증 단계이며 운영 D1 `0009` 적용, `COURSE_ADMIN_TOKEN` 등록, Worker 재배포는 아직 수행하지 않았습니다.
+
+## 이전 완료: 11단계 이메일 이전·복구
 
 선택형 복구 이메일의 인증, Resend 전송 어댑터, 15분 1회용 코드, 새 기기 이전과 기존 기기 폐기, 앱 딥 링크를 구현했습니다. 이메일은 일반 로그인이나 회원가입에 사용하지 않습니다. 운영 Worker/D1 배포와 Resend 실발송·서버 기기 이전 검증까지 완료했으며 Android 앱 링크와 실기기 생명주기 확인은 별도입니다. 자세한 기준은 [docs/EMAIL_RECOVERY.md](docs/EMAIL_RECOVERY.md)를 읽으세요.
 
@@ -6,7 +16,7 @@
 - 새 기기는 이메일 존재 여부를 드러내지 않는 요청으로 코드를 받고, 성공 시 기존 활성 기기를 폐기하고 복구 키도 교체합니다.
 - 요청 ID, 새 기기 비밀값, 다음 복구 키를 서버 요청 전에 SecureStore에 보관해 응답 유실 후 같은 요청을 재확인합니다.
 - Resend API 키와 코드 HMAC secret은 Wrangler secret으로만 주입하며 소스·앱·D1에 원문을 저장하지 않습니다.
-- `0008_email_recovery.sql`을 추가했고 운영 D1에 `0001`~`0008`을 적용했습니다. Worker는 `https://yamone-golf-api.yamone-golf.workers.dev`에서 동작합니다.
+- `0008_email_recovery.sql`까지 운영 D1에 적용했습니다. 배포된 기존 Worker는 `https://yamone-golf-api.yamone-golf.workers.dev`에서 동작합니다.
 
 ## 이전 완료: 10단계 광고 SDK 개발 연결
 

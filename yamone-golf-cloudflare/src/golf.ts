@@ -34,8 +34,14 @@ type Course = {
   course_id: string;
   name: string;
   region: string;
+  country_code: string;
+  city: string;
   segments_json: string;
   version: number;
+  source_name: string | null;
+  source_url: string | null;
+  active: number;
+  managed_by_admin: number;
 };
 type Action = {
   action_id: string;
@@ -85,13 +91,23 @@ function courseInput(b: Record<string, unknown>) {
   };
 }
 function courseView(c: Course) {
-  const { segments_json, ...rest } = c;
-  return { ...rest, segments: JSON.parse(segments_json) as Segment[] };
+  return {
+    course_id: c.course_id,
+    name: c.name,
+    region: c.region,
+    country_code: c.country_code,
+    city: c.city,
+    segments: JSON.parse(c.segments_json) as Segment[],
+    version: c.version,
+    source_name: c.source_name,
+    source_url: c.source_url,
+    managed_by_admin: c.managed_by_admin === 1,
+  };
 }
 async function getCourse(env: Env, id: string) {
   const c = await stmt(
     env,
-    "SELECT * FROM courses WHERE course_id=?",
+    "SELECT * FROM courses WHERE course_id=? AND active=1",
     id,
   ).first<Course>();
   if (!c) throw new ApiError("course_not_found", 404);
@@ -126,7 +142,7 @@ async function mine(env: Env, d: Device) {
   const row = await stmt(
     env,
     `SELECT COALESCE((SELECT version FROM course_lists WHERE user_id=?),0) AS version,
-    (SELECT json_group_array(json(item)) FROM (SELECT json_object('course_id',c.course_id,'name',c.name,'region',c.region,'segments',json(c.segments_json),'version',c.version) AS item FROM user_courses u JOIN courses c ON c.course_id=u.course_id WHERE u.user_id=? ORDER BY u.sort_order,c.course_id)) AS items`,
+    (SELECT json_group_array(json(item)) FROM (SELECT json_object('course_id',c.course_id,'name',c.name,'region',c.region,'country_code',c.country_code,'city',c.city,'segments',json(c.segments_json),'version',c.version,'source_name',c.source_name,'source_url',c.source_url,'managed_by_admin',c.managed_by_admin=1) AS item FROM user_courses u JOIN courses c ON c.course_id=u.course_id WHERE u.user_id=? AND c.active=1 ORDER BY u.sort_order,c.course_id)) AS items`,
     d.user_id,
     d.user_id,
   ).first<{ version: number; items: string }>();
@@ -338,7 +354,7 @@ export async function golfRoute(request: Request, env: Env): Promise<Response> {
       throw new ApiError("invalid_request");
     const rows = await stmt(
       env,
-      "SELECT * FROM courses WHERE instr(lower(name||' '||region),lower(?))>0 ORDER BY name,course_id LIMIT 31 OFFSET ?",
+      "SELECT * FROM courses WHERE active=1 AND instr(lower(name||' '||region||' '||city),lower(?))>0 ORDER BY name,course_id LIMIT 31 OFFSET ?",
       q,
       offset,
     ).all<Course>();
@@ -389,8 +405,10 @@ export async function golfRoute(request: Request, env: Env): Promise<Response> {
   const courseMatch = path.match(/^\/api\/courses\/([^/]+)$/);
   if (courseMatch && ["GET", "PATCH"].includes(method)) {
     const id = uid(courseMatch[1]);
-    await getCourse(env, id);
+    const current = await getCourse(env, id);
     if (method === "PATCH") {
+      if (current.managed_by_admin === 1)
+        throw new ApiError("course_admin_managed", 403);
       const b = await body(request),
         v = courseInput(b),
         version = revision(b.version);
@@ -574,6 +592,11 @@ export async function golfRoute(request: Request, env: Env): Promise<Response> {
           version: c.version,
           name: c.name,
           region: c.region,
+          country_code: c.country_code,
+          city: c.city,
+          source_name: c.source_name,
+          source_url: c.source_url,
+          managed_by_admin: c.managed_by_admin === 1,
           segments: selected,
         },
         hole_count: selected.length * 9,

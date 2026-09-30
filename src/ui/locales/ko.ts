@@ -42,7 +42,8 @@ export default {
   email_in_use: "이미 다른 사용자에 등록된 이메일입니다.",
   invalid_email_verification: "인증 코드가 올바르지 않거나 만료되었습니다.",
   invalid_email_recovery: "복구 코드가 올바르지 않거나 만료되었습니다.",
-  email_delivery_failed: "이메일을 보내지 못했습니다. 잠시 후 다시 시도해 주세요.",
+  email_delivery_failed:
+    "이메일을 보내지 못했습니다. 잠시 후 다시 시도해 주세요.",
   email_not_configured: "복구 이메일 서비스가 아직 준비되지 않았습니다.",
   request_expired: "요청이 만료되었습니다. 새 코드를 요청해 주세요.",
   back: "돌아가기",
@@ -112,6 +113,9 @@ export default {
   editCourse: "공용 정보 수정",
   courseName: "골프장 이름",
   region: "지역",
+  countryKorea: "한국",
+  countryPhilippines: "필리핀",
+  courseDataSource: "코스 정보 출처",
   segmentName: "코스 이름",
   segmentHint: "코스 하나는 9홀입니다. 홀별 PAR을 확인해 주세요.",
   sharedHelp:
@@ -207,6 +211,8 @@ export default {
   duplicate_segment: "코스 이름은 서로 다르게 입력해 주세요.",
   invalid_players: "플레이어 이름과 인원(1~8명)을 확인해 주세요.",
   course_not_found: "골프장을 찾을 수 없습니다.",
+  course_admin_managed:
+    "관리자가 관리하는 골프장입니다. 잘못된 정보는 고객지원으로 알려 주세요.",
   round_not_found: "진행 중인 라운드를 찾을 수 없습니다. 코드를 확인해 주세요.",
   active_round_exists:
     "이미 진행 중인 라운드가 있습니다. 홈에서 확인해 주세요.",

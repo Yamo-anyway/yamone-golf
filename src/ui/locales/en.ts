@@ -111,6 +111,9 @@ const en: Record<keyof typeof ko, string> = {
   editCourse: "Edit shared course",
   courseName: "Course name",
   region: "Region",
+  countryKorea: "South Korea",
+  countryPhilippines: "Philippines",
+  courseDataSource: "Course data source",
   segmentName: "Nine-hole course name",
   segmentHint: "Each course has nine holes. Check the PAR for each hole.",
   sharedHelp:
@@ -206,6 +209,8 @@ const en: Record<keyof typeof ko, string> = {
   duplicate_segment: "Give each nine-hole course a different name.",
   invalid_players: "Check player names and count (1–8).",
   course_not_found: "Course not found.",
+  course_admin_managed:
+    "This course is managed by an administrator. Contact support to report incorrect data.",
   round_not_found: "No active round found. Check the code.",
   active_round_exists:
     "You already have an active round. Check your home screen.",

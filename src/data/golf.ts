@@ -7,6 +7,11 @@ export type Course = {
   course_id: string;
   name: string;
   region: string;
+  country_code?: string;
+  city?: string;
+  source_name?: string | null;
+  source_url?: string | null;
+  managed_by_admin?: boolean;
   version: number;
   segments: Segment[];
 };

@@ -1,3 +1,14 @@
+# 골프장 데이터 관리자 — v0.3.12 / 2026-09-30
+
+- Worker/D1 100개 + 앱 상태·정책 65개 = **165개 자동 테스트 통과**. 새 검증은 관리자 토큰 비공개/오인증 차단, GolfCore 요청·9홀 정규화·중복 제거, 검토값/출처 저장·멱등 재시도, 직접 등록·수정·비활성화·이력, 비활성 코스의 앱 신규 선택 차단을 포함합니다.
+- Expo ESLint 경고 0, 앱/Worker TypeScript, `git diff --check` 통과.
+- 로컬 D1 빈 DB에 `0001`~`0009` 전체 마이그레이션 적용 통과.
+- Expo Web 및 Android Hermes 번들 생성 통과.
+- 관리자 HTML의 CSP·frame 차단·secret 미포함은 자동 검증했습니다. 이 실행 환경의 Chromium 바이너리가 시작 중 종료되어 관리자 화면의 실제 브라우저 렌더링·모바일 시각 검증은 완료하지 못했습니다.
+- 운영 D1 `0009`, `COURSE_ADMIN_TOKEN`, 새 Worker는 적용하지 않았습니다. 실제 GolfCore 운영 호출과 관리자 운영 브라우저 검증도 배포 후 소량 코스로 별도 확인합니다.
+
+---
+
 # 12단계 Android QA APK — v0.3.11 / 2026-09-29
 
 - GitHub Actions `Android QA APK` [run 36540461421](https://github.com/Yamo-anyway/yamone-golf/actions/runs/36540461421)이 commit `2af95501ca2574e8b61f9dc23f925c79543d0ec2`에서 성공했습니다.

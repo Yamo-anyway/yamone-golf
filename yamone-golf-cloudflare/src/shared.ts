@@ -7,6 +7,8 @@ export interface Env {
   EMAIL_APP_LINK?: string;
   RESEND_API_KEY?: string;
   EMAIL_TOKEN_SECRET?: string;
+  COURSE_ADMIN_TOKEN?: string;
+  GOLFCORE_API?: Fetcher;
 }
 export type User = {
   user_id: string;
