@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
@@ -20,8 +20,7 @@ import { AdBanner } from "./ad-banner";
 import { AdPrivacy } from "./ad-privacy";
 import { BannerPlacement } from "./banner-context";
 import { showBanner, type BannerContext } from "../data/ad-policy";
-import Svg, { Path, Rect } from "react-native-svg";
-import { create } from "qrcode/lib/core/qrcode";
+import { QRCode } from "./qr-code";
 import { Button, Card, colors, Field, styles, Txt } from "./components";
 import { Icon, type IconName } from "./icons";
 import { useErrorText, useSession } from "./session";
@@ -46,30 +45,6 @@ function emailErrorKey(code: string) {
   }
 }
 
-function PersonalQR({ value, label }: { value: string; label: string }) {
-  const matrix = useMemo(
-    () => create(value, { errorCorrectionLevel: "M" }).modules,
-    [value],
-  );
-  let d = "";
-  for (let y = 0; y < matrix.size; y++)
-    for (let x = 0; x < matrix.size; x++)
-      if (matrix.get(y, x)) d += `M${x + 4} ${y + 4}h1v1h-1z`;
-  return (
-    <View style={{ alignItems: "center" }}>
-      <Svg
-        accessibilityLabel={label}
-        accessibilityRole="image"
-        width={196}
-        height={196}
-        viewBox={`0 0 ${matrix.size + 8} ${matrix.size + 8}`}
-      >
-        <Rect width="100%" height="100%" fill="white" />
-        <Path d={d} fill={colors.ink} />
-      </Svg>
-    </View>
-  );
-}
 function Welcome() {
   const s = useSession();
   const [mode, setMode] = useState<"new" | "key" | "email">(
@@ -621,7 +596,7 @@ export function ProfileScreen() {
           secondary
           onPress={() => setQR(!qr)}
         />
-        {qr && <PersonalQR value={p.personal_qr} label={s.t("qrLabel")} />}
+        {qr && <QRCode value={p.personal_qr} label={s.t("qrLabel")} />}
       </Card>
       <Card>
         <Txt style={{ fontWeight: "700" }}>{s.t("language")}</Txt>

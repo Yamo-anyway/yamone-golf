@@ -61,7 +61,7 @@ export default {
   codeHelp: "동반자가 나를 찾을 때 사용하는 코드입니다.",
   qrShow: "내 QR 보기",
   qrHide: "QR 닫기",
-  qrLabel: "사용자 연결용 개인 QR",
+  qrLabel: "초대와 플레이어 연결용 개인 QR",
   backupTitle: "복구 키를 따로 보관하세요",
   backupBody:
     "앱 삭제나 기기 분실 후 같은 사용자로 돌아올 때 필요합니다. 개인 코드와 달리 다른 사람에게 공유하지 마세요.",
@@ -172,7 +172,8 @@ export default {
   sendInvite: "초대 보내기",
   inviteCode: "동반자의 개인 코드",
   inviteSent: "초대를 보냈습니다.",
-  inviteHelp: "초대받은 사람의 홈에 카드가 표시됩니다.",
+  inviteHelp:
+    "동반자의 개인 코드를 입력하거나 QR을 스캔하세요. 보낸 초대는 상대의 홈에 표시됩니다.",
   stage2RoundHelp:
     "플레이어·입력 대상을 관리하고 홀별 점수를 기록할 수 있어요. 라운드 종료는 다음 단계에서 연결합니다.",
   pendingRound: "진행하던 라운드 작업",
@@ -288,13 +289,24 @@ export default {
   targetsSaved: "내 입력 대상과 순서를 저장했습니다.",
   unsavedTargets: "아직 저장하지 않은 선택입니다.",
   selectedCount: "선택 인원",
+  roundQRShow: "라운드 QR 보기",
+  roundQRHide: "라운드 QR 닫기",
+  roundQRLabel: "방 참여용 라운드 QR",
+  roundQRHelp:
+    "동반자가 방 참여 화면에서 스캔하면 골프장과 생성자를 확인한 뒤 참여할 수 있어요.",
+  roundQRScan: "라운드 QR 스캔",
+  roundQRScanHelp:
+    "방 참여용 라운드 QR을 화면 안에 맞춰 주세요. 스캔 후 참여할 방을 확인합니다.",
+  invalid_round_code:
+    "라운드 코드 또는 Yamone Golf 라운드 QR을 확인해 주세요. 개인 QR은 방 참여용이 아닙니다.",
+  inviteRecipient: "초대할 사용자",
   qrScan: "개인 QR 스캔",
   qrScanHelp: "동반자의 개인 QR을 화면 안에 맞춰 주세요.",
   cameraHelp:
-    "개인 QR을 읽으려면 카메라 접근이 필요합니다. 사진이나 영상을 저장하지 않습니다.",
+    "QR을 읽으려면 카메라 접근이 필요합니다. 사진이나 영상을 저장하지 않습니다.",
   allowCamera: "카메라 허용",
   cameraUnavailable:
-    "카메라를 사용할 수 없습니다. 권한을 확인하거나 개인 코드를 직접 입력해 주세요.",
+    "카메라를 사용할 수 없습니다. 권한을 확인하거나 코드를 직접 입력해 주세요.",
   closeScan: "닫고 코드 입력",
   invalid_personal_code: "개인 코드 또는 Yamone Golf 개인 QR을 확인해 주세요.",
   player_not_found: "이 플레이어는 삭제되었거나 찾을 수 없습니다.",

@@ -1,5 +1,11 @@
 import React, { useEffect, useRef, useState } from "react";
-import { Pressable, ScrollView, StyleSheet, View } from "react-native";
+import {
+  Platform,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  View,
+} from "react-native";
 import { router, useLocalSearchParams } from "expo-router";
 import * as Crypto from "expo-crypto";
 import {
@@ -11,6 +17,11 @@ import {
   type PendingRound,
 } from "../data/golf";
 import { players } from "../data/players";
+import { ApiError } from "../data/api";
+import { normalizePersonalCode } from "../../shared/personal-code";
+import { normalizeRoundCode, roundQRValue } from "../../shared/round-code";
+import { QRCode } from "./qr-code";
+import { QRScanner } from "./qr-scanner";
 import { RoundSteps, FlowNote } from "./round-flow";
 import { RecordsHomeEntry } from "./records";
 import type { AdEvidence } from "../data/ad-config";
@@ -408,11 +419,11 @@ export function HomeRounds() {
             }
           />
           <RoundRowAction
-            label={lang === "ko" ? "코드로 방 참여하기" : t("joinRound")}
+            label={lang === "ko" ? "코드·QR로 방 참여하기" : t("joinRound")}
             detail={
               lang === "ko"
-                ? "전달받은 라운드 코드로 참여"
-                : "Join using your round code"
+                ? "라운드 코드 입력 또는 QR 스캔"
+                : "Join with a round code or QR"
             }
             icon="user"
             testID="join-round"
@@ -857,9 +868,22 @@ export function JoinRoundScreen() {
   const { profile, t, lang } = useSession(),
     task = useTask();
   const [code, setCode] = useState(""),
+    [scan, setScan] = useState(false),
+    [verifiedCode, setVerifiedCode] = useState(""),
     [result, setResult] = useState<Awaited<
       ReturnType<typeof golf.lookup>
     > | null>(null);
+  async function lookup(value = code) {
+    setResult(null);
+    await task.run(async () => {
+      const normalized = normalizeRoundCode(value);
+      if (!normalized) throw new ApiError("invalid_round_code");
+      const found = await golf.lookup(normalized);
+      setCode(normalized);
+      setVerifiedCode(normalized);
+      setResult(found);
+    });
+  }
   return (
     <>
       <Heading title={t("joinRound")} />
@@ -869,8 +893,8 @@ export function JoinRoundScreen() {
         }
       >
         {lang === "ko"
-          ? "라운드 참여 코드를 입력하고 골프장과 생성자를 확인하세요. 개인 코드는 플레이어 연결에 사용합니다."
-          : "Enter the round code, then check the course and host. Personal codes are for linking players."}
+          ? "라운드 코드를 입력하거나 라운드 QR을 스캔한 뒤 골프장과 생성자를 확인하세요. 개인 QR은 초대와 플레이어 연결에 사용합니다."
+          : "Enter a round code or scan a round QR, then check the course and host. Personal QR codes are for invitations and player linking."}
       </FlowNote>
       <Problem text={task.errorText} />
       <Field
@@ -879,7 +903,8 @@ export function JoinRoundScreen() {
         value={code}
         autoCapitalize="characters"
         autoCorrect={false}
-        maxLength={32}
+        maxLength={180}
+        editable={!task.busy}
         onChangeText={(value) => {
           setCode(value);
           setResult(null);
@@ -890,10 +915,28 @@ export function JoinRoundScreen() {
         testID="lookup-round"
         busy={task.busy}
         disabled={!code.trim()}
-        onPress={() =>
-          void task.run(async () => setResult(await golf.lookup(code)))
-        }
+        onPress={() => void lookup()}
       />
+      {Platform.OS !== "web" && (
+        <Button
+          label={t("roundQRScan")}
+          testID="scan-round-qr"
+          secondary
+          disabled={task.busy}
+          onPress={() => setScan(true)}
+        />
+      )}
+      {scan && (
+        <QRScanner
+          kind="round"
+          onClose={() => setScan(false)}
+          onCode={(value) => {
+            setScan(false);
+            setCode(value);
+            void lookup(value);
+          }}
+        />
+      )}
       {result && (
         <Card>
           <CourseSummary
@@ -910,7 +953,7 @@ export function JoinRoundScreen() {
             busy={task.busy}
             onPress={() =>
               void task.run(() =>
-                begin(profile!.user_id, { kind: "join", code }),
+                begin(profile!.user_id, { kind: "join", code: verifiedCode }),
               )
             }
           />
@@ -1083,7 +1126,16 @@ export function RoundScreen() {
     task = useTask();
   const [code, setCode] = useState(""),
     [sent, setSent] = useState(false),
+    [showQR, setShowQR] = useState(false),
+    [scan, setScan] = useState(false),
+    [recipient, setRecipient] = useState<string | null>(null),
     [requestId, setRequestId] = useState(Crypto.randomUUID());
+  function changeInviteCode(value: string) {
+    setCode(value);
+    setSent(false);
+    setRecipient(null);
+    setRequestId(Crypto.randomUUID());
+  }
   const detail = query.data;
   const scoring = useLoad(() => players.targets(id));
   const me = detail?.players.find((p) => p.user_id === profile!.user_id);
@@ -1315,6 +1367,21 @@ export function RoundScreen() {
                   </Txt>
                 </View>
                 <Txt style={layout.caption}>{t("selectHint")}</Txt>
+                <Button
+                  label={t(showQR ? "roundQRHide" : "roundQRShow")}
+                  testID="show-round-qr"
+                  secondary
+                  onPress={() => setShowQR(!showQR)}
+                />
+                {showQR && (
+                  <>
+                    <QRCode
+                      value={roundQRValue(detail.round.join_code)}
+                      label={t("roundQRLabel")}
+                    />
+                    <Txt style={layout.caption}>{t("roundQRHelp")}</Txt>
+                  </>
+                )}
                 <View style={layout.divider} />
                 <Txt style={{ fontWeight: "700" }}>{t("sendInvite")}</Txt>
                 <Txt style={layout.caption}>{t("inviteHelp")}</Txt>
@@ -1322,16 +1389,39 @@ export function RoundScreen() {
                   label={t("inviteCode")}
                   testID="invite-code"
                   value={code}
-                  maxLength={32}
+                  maxLength={180}
                   autoCapitalize="characters"
                   autoCorrect={false}
                   editable={!task.busy}
-                  onChangeText={(value) => {
-                    setCode(value);
-                    setSent(false);
-                    setRequestId(Crypto.randomUUID());
-                  }}
+                  onChangeText={changeInviteCode}
                 />
+                {Platform.OS !== "web" && (
+                  <Button
+                    label={t("qrScan")}
+                    testID="scan-invite-qr"
+                    secondary
+                    disabled={task.busy}
+                    onPress={() => setScan(true)}
+                  />
+                )}
+                {scan && (
+                  <QRScanner
+                    onClose={() => setScan(false)}
+                    onCode={(value) => {
+                      setScan(false);
+                      changeInviteCode(value);
+                      void task.run(async () => {
+                        const found = await players.lookup(id, value);
+                        setRecipient(found.user.nickname);
+                      });
+                    }}
+                  />
+                )}
+                {recipient && (
+                  <Txt>
+                    {t("inviteRecipient")}: {recipient}
+                  </Txt>
+                )}
                 <Button
                   label={t("sendInvite")}
                   testID="send-invite"
@@ -1340,7 +1430,10 @@ export function RoundScreen() {
                   disabled={!code.trim() || sent}
                   onPress={() =>
                     void task.run(async () => {
-                      await golf.invite(id, requestId, code);
+                      const normalized = normalizePersonalCode(code);
+                      if (!normalized)
+                        throw new ApiError("invalid_personal_code");
+                      await golf.invite(id, requestId, normalized);
                       setSent(true);
                     })
                   }

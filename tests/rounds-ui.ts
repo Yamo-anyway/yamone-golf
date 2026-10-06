@@ -214,7 +214,22 @@ async function main() {
       roundId,
     );
     const code = (await a.page.getByTestId("round-code").textContent())!;
-    await a.page.getByTestId("invite-code").fill(b.profile.personal_code);
+    await a.page.getByTestId("show-round-qr").click();
+    await a.page
+      .getByRole("img", { name: "방 참여용 라운드 QR", exact: true })
+      .waitFor();
+    // A round QR must not invite a personal identity.
+    await a.page.getByTestId("invite-code").fill(`yamone-golf://round/${code}`);
+    await a.page.getByTestId("send-invite").click();
+    await a.page
+      .getByText("개인 코드 또는 Yamone Golf 개인 QR을 확인해 주세요.", {
+        exact: true,
+      })
+      .waitFor();
+    assert.equal((await api(b.page, "/api/home")).invitations.length, 0);
+    await a.page.getByTestId("invite-code").fill(b.profile.personal_qr);
+    // Pasted QR data and camera results use the same identity path; sending remains explicit.
+    assert.equal((await api(b.page, "/api/home")).invitations.length, 0);
     await a.page.getByTestId("send-invite").click();
     await a.page.getByText("초대를 보냈습니다.", { exact: true }).waitFor();
     await b.page.getByTestId("refresh-home").click();
@@ -243,8 +258,19 @@ async function main() {
       roundId,
     );
     await c.page.getByTestId("join-round").click();
-    await c.page.getByTestId("join-code").fill(code);
+    await c.page.getByTestId("join-code").fill(c.profile.personal_qr);
     await c.page.getByTestId("lookup-round").click();
+    await c.page
+      .getByText(
+        "라운드 코드 또는 Yamone Golf 라운드 QR을 확인해 주세요. 개인 QR은 방 참여용이 아닙니다.",
+        { exact: true },
+      )
+      .waitFor();
+    assert.equal(await c.page.getByTestId("confirm-join").count(), 0);
+    await c.page.getByTestId("join-code").fill(`yamone-golf://round/${code}`);
+    await c.page.getByTestId("lookup-round").click();
+    await c.page.getByTestId("confirm-join").waitFor();
+    assert.equal((await api(c.page, "/api/home")).active_round, null);
     await c.page.getByTestId("confirm-join").click();
     await c.page.getByTestId("ad-unavailable").click();
     await c.page.getByTestId("round-code").waitFor();
