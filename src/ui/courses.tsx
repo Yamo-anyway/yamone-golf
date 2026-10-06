@@ -1,3 +1,4 @@
+import { RoundSteps } from "./round-flow";
 import { DragRow } from "./drag-row";
 import { Icon } from "./icons";
 import React, { useRef, useState } from "react";
@@ -15,7 +16,13 @@ export function Problem({ text }: { text: string }) {
     </Txt>
   ) : null;
 }
-export function Heading({ title }: { title: string }) {
+export function Heading({
+  title,
+  onBack,
+}: {
+  title: string;
+  onBack?: () => void;
+}) {
   const { t } = useSession();
   return (
     <View
@@ -30,7 +37,11 @@ export function Heading({ title }: { title: string }) {
         accessibilityRole="button"
         accessibilityLabel={t("back")}
         onPress={() =>
-          router.canGoBack() ? router.back() : router.dismissTo("/")
+          onBack
+            ? onBack()
+            : router.canGoBack()
+              ? router.back()
+              : router.dismissTo("/")
         }
         style={({ pressed }) => ({
           width: 48,
@@ -259,6 +270,7 @@ export function CoursesScreen() {
   return (
     <>
       <Heading title={t(select === "1" ? "selectCourse" : "courses")} />
+      {select === "1" && <RoundSteps step={0} />}
       <View style={styles.row}>
         <View style={{ flex: 1 }}>
           <Button

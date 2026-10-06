@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from "react";
-import { Pressable, StyleSheet, View } from "react-native";
+import { Pressable, ScrollView, StyleSheet, View } from "react-native";
 import { router, useLocalSearchParams } from "expo-router";
 import * as Crypto from "expo-crypto";
 import {
@@ -10,6 +10,8 @@ import {
   type JoinInput,
   type PendingRound,
 } from "../data/golf";
+import { players } from "../data/players";
+import { RoundSteps, FlowNote } from "./round-flow";
 import { RecordsHomeEntry } from "./records";
 import type { AdEvidence } from "../data/ad-config";
 import { presentInterstitial, waitUntilAdForeground } from "../data/mobile-ads";
@@ -397,7 +399,7 @@ export function HomeRounds() {
               : "Choose a course and keep score together."}
           </Txt>
           <Button
-            label={t("newRound")}
+            label={lang === "ko" ? "라운드 방 만들기" : t("newRound")}
             icon={<Icon name="plus" size={20} color="#FFFFFF" />}
             testID="new-round"
             disabled={!home || task.busy || !!task.data?.pending}
@@ -406,7 +408,7 @@ export function HomeRounds() {
             }
           />
           <RoundRowAction
-            label={t("joinRound")}
+            label={lang === "ko" ? "코드로 방 참여하기" : t("joinRound")}
             detail={
               lang === "ko"
                 ? "전달받은 라운드 코드로 참여"
@@ -529,17 +531,19 @@ export function HomeRounds() {
   );
 }
 export function NewRoundScreen() {
-  const { profile, t } = useSession();
+  const { profile, t, lang } = useSession();
   const { course_id } = useLocalSearchParams<{ course_id: string }>();
   const query = useLoad(async () => (await golf.course(course_id)).course),
     task = useTask();
-  const [holes, setHoles] = useState<9 | 18>(18),
+  const [step, setStep] = useState(0),
+    [holes, setHoles] = useState<9 | 18>(18),
     [front, setFront] = useState(0),
     [back, setBack] = useState(0),
     [self, setSelf] = useState(true),
     [names, setNames] = useState([profile!.nickname]),
     [touched, setTouched] = useState(false),
     [saved, setSaved] = useState(false);
+  const scroll = useRef<ScrollView>(null);
   useDraftGuard(touched && !saved);
   useEffect(() => {
     if (saved) router.replace("/round-action");
@@ -550,6 +554,26 @@ export function NewRoundScreen() {
   function touch() {
     if (!frozen && c) setFrozen(c);
     setTouched(true);
+  }
+  function goStep(value: number) {
+    setStep(value);
+    scroll.current?.scrollTo({ y: 0, animated: false });
+  }
+  function chooseRole(value: boolean) {
+    if (value === self || (value && names.length === 8)) return;
+    touch();
+    setSelf(value);
+    // Removing the recorder from the roster must remove their name as well.
+    setNames(
+      value
+        ? [
+            profile!.nickname,
+            ...(names.length === 1 && !names[0].trim() ? [] : names),
+          ]
+        : names.slice(1).length
+          ? names.slice(1)
+          : [""],
+    );
   }
   function selectHalf(
     label: string,
@@ -609,91 +633,200 @@ export function NewRoundScreen() {
     );
   }
   return (
-    <>
-      <Heading title={t("roundSetup")} />
-      <Problem text={task.errorText || query.errorText} />
-      {!current ? (
-        <Button label={t("retry")} onPress={() => void query.reload()} />
-      ) : (
-        <>
-          <Card>
-            <CourseSummary course={current} holes={holes} />
-          </Card>
-          <SectionTitle title={t("playedHoles")} />
-          <View style={styles.row}>
-            {([9, 18] as const).map((n) => (
-              <View key={n} style={{ flex: 1 }}>
-                <Button
-                  label={`${n} ${t("hole")}`}
-                  secondary={holes !== n}
-                  onPress={() => {
-                    touch();
-                    setHoles(n);
-                  }}
+    <View style={{ flex: 1 }}>
+      <View style={{ padding: 16, paddingTop: 8, gap: 16 }}>
+        <Heading
+          title={lang === "ko" ? "라운드 방 만들기" : "Create a round"}
+          onBack={step > 0 ? () => goStep(step - 1) : undefined}
+        />
+        <RoundSteps step={step + 1} />
+      </View>
+      <ScrollView
+        ref={scroll}
+        keyboardShouldPersistTaps="handled"
+        contentContainerStyle={{ padding: 16, paddingTop: 4, gap: 18 }}
+      >
+        <Problem text={task.errorText || query.errorText} />
+        {!current ? (
+          <Button label={t("retry")} onPress={() => void query.reload()} />
+        ) : (
+          <>
+            <Card>
+              <CourseSummary
+                course={{
+                  ...current,
+                  segments: (holes === 9 ? [front] : [front, back]).map(
+                    (i) => current.segments[i],
+                  ),
+                }}
+                holes={holes}
+              />
+            </Card>
+            {step === 0 ? (
+              <>
+                <SectionTitle title={t("playedHoles")} />
+                <View style={styles.row}>
+                  {([9, 18] as const).map((n) => (
+                    <View key={n} style={{ flex: 1 }}>
+                      <Button
+                        label={`${n} ${t("hole")}`}
+                        testID={`setup-holes-${n}`}
+                        secondary={holes !== n}
+                        onPress={() => {
+                          touch();
+                          setHoles(n);
+                        }}
+                      />
+                    </View>
+                  ))}
+                </View>
+                {holes === 9 && (
+                  <FlowNote
+                    title={
+                      lang === "ko"
+                        ? "9홀도 기록할 수 있어요"
+                        : "A nine-hole round"
+                    }
+                  >
+                    {lang === "ko"
+                      ? "기록은 보관되며 개인 18홀 통계에는 포함되지 않습니다."
+                      : "Your record is kept, but excluded from personal 18-hole statistics."}
+                  </FlowNote>
+                )}
+                {selectHalf(t("frontNine"), front, setFront)}
+                {holes === 18 && selectHalf(t("backNine"), back, setBack)}
+                {holes === 18 && (
+                  <Txt style={layout.caption}>{t("repeatNine")}</Txt>
+                )}
+              </>
+            ) : (
+              <>
+                <SectionTitle
+                  title={
+                    lang === "ko"
+                      ? "이번 라운드에서 나는"
+                      : "My role this round"
+                  }
                 />
-              </View>
-            ))}
-          </View>
-          {selectHalf(t("frontNine"), front, setFront)}
-          {holes === 18 && selectHalf(t("backNine"), back, setBack)}
-          {holes === 18 && <Txt style={layout.caption}>{t("repeatNine")}</Txt>}
-          <Card>
-            <Txt style={{ fontSize: 21, lineHeight: 29, fontWeight: "700" }}>
-              {t("players")}
-            </Txt>
-            <Txt style={layout.caption}>{t("recorderHelp")}</Txt>
-            <Button
-              label={`${self ? "✓ " : ""}${t("selfPlay")}`}
-              secondary={!self}
-              testID="self-play"
-              onPress={() => {
-                touch();
-                setSelf(!self);
-              }}
-            />
-            {names.map((name, i) => (
-              <Field
-                key={i}
-                label={`${t("player")} ${i + 1}${self && i === 0 ? " · " + t("selfPlay") : ""}`}
-                testID={"player-" + i}
-                value={name}
-                maxLength={16}
-                onChangeText={(value) => {
-                  touch();
-                  setNames(names.map((n, j) => (j === i ? value : n)));
-                }}
-              />
-            ))}
-            {names.length < 8 && (
-              <Button
-                label={t("addPlayer")}
-                icon={<Icon name="plus" size={18} color={colors.green} />}
-                secondary
-                testID="add-player"
-                onPress={() => {
-                  touch();
-                  setNames([...names, ""]);
-                }}
-              />
+                <View style={{ gap: 10 }}>
+                  <Button
+                    label={
+                      lang === "ko"
+                        ? "나도 플레이 + 기록"
+                        : "Play and keep score"
+                    }
+                    secondary={!self}
+                    testID="self-play"
+                    disabled={!self && names.length === 8}
+                    onPress={() => chooseRole(true)}
+                  />
+                  <Button
+                    label={
+                      lang === "ko"
+                        ? "플레이하지 않고 기록만"
+                        : "Keep score only"
+                    }
+                    secondary={self}
+                    testID="recorder-only"
+                    onPress={() => chooseRole(false)}
+                  />
+                </View>
+                <FlowNote
+                  title={
+                    lang === "ko"
+                      ? self
+                        ? "내 점수도 함께 기록해요"
+                        : "동반자의 점수를 기록해요"
+                      : self
+                        ? "You are a player too"
+                        : "You are the recorder"
+                  }
+                >
+                  {lang === "ko"
+                    ? self
+                      ? "첫 번째 플레이어에 내 사용자가 연결됩니다."
+                      : "나는 방에 참여하지만 플레이어 수에는 포함되지 않습니다."
+                    : self
+                      ? "Your user is linked to the first player."
+                      : "You join the room without taking a player slot."}
+                </FlowNote>
+                <Card>
+                  <SectionTitle title={t("players")} count={names.length} />
+                  <Txt style={layout.caption}>
+                    {lang === "ko"
+                      ? "1~8명 · 이름을 비워 두면 임시 이름으로 시작합니다."
+                      : "1–8 players · Blank names use temporary labels."}
+                  </Txt>
+                  {names.map((name, i) => (
+                    <Field
+                      key={i}
+                      label={`${t("player")} ${i + 1}${self && i === 0 ? " · " + t("selfPlay") : ""}`}
+                      testID={"player-" + i}
+                      value={name}
+                      placeholder={`${t("player")} ${i + 1}`}
+                      maxLength={16}
+                      onChangeText={(value) => {
+                        touch();
+                        setNames(names.map((n, j) => (j === i ? value : n)));
+                      }}
+                    />
+                  ))}
+                  {names.length < 8 && (
+                    <Button
+                      label={t("addPlayer")}
+                      icon={<Icon name="plus" size={18} color={colors.green} />}
+                      secondary
+                      testID="add-player"
+                      onPress={() => {
+                        touch();
+                        setNames([...names, ""]);
+                      }}
+                    />
+                  )}
+                  {names.length > 1 && (
+                    <Button
+                      label={t("removePlayer")}
+                      quiet
+                      secondary
+                      onPress={() => {
+                        touch();
+                        setNames(names.slice(0, -1));
+                      }}
+                    />
+                  )}
+                </Card>
+              </>
             )}
-            {names.length > 1 && (
-              <Button
-                label={t("removePlayer")}
-                quiet
-                secondary
-                onPress={() => {
-                  touch();
-                  setNames(names.slice(0, -1));
-                }}
-              />
-            )}
-          </Card>
+          </>
+        )}
+      </ScrollView>
+      <View
+        style={{
+          borderTopWidth: 1,
+          borderColor: colors.line,
+          padding: 16,
+          gap: 8,
+          backgroundColor: "#FFFFFF",
+        }}
+      >
+        <Txt style={layout.caption}>
+          {lang === "ko"
+            ? "최종 확인 후 방이 생성됩니다."
+            : "Your round is created after final confirmation."}
+        </Txt>
+        {step === 0 ? (
+          <Button
+            label={lang === "ko" ? "다음 · 플레이어 설정" : "Next · Players"}
+            testID="setup-players"
+            disabled={!current}
+            onPress={() => goStep(1)}
+          />
+        ) : (
           <Button
             label={t("reviewCreate")}
-            icon={<Icon name="chevron-right" size={19} color="#FFFFFF" />}
             testID="review-create"
             busy={task.busy}
-            disabled={names.some((n) => !n.trim())}
+            disabled={!current}
             onPress={() =>
               void task.run(async () => {
                 const old = await pendingRound.read(profile!.user_id);
@@ -702,11 +835,11 @@ export function NewRoundScreen() {
                     action_id: Crypto.randomUUID(),
                     input: {
                       kind: "create",
-                      course_id: current.course_id,
-                      course_version: current.version,
+                      course_id: current!.course_id,
+                      course_version: current!.version,
                       segment_indices: holes === 9 ? [front] : [front, back],
                       players: names.map((name, i) => ({
-                        name,
+                        name: name.trim() || `${t("player")} ${i + 1}`,
                         self: self && i === 0,
                       })),
                     },
@@ -715,20 +848,13 @@ export function NewRoundScreen() {
               })
             }
           />
-          {saved && (
-            <Button
-              label={t("resumeRound")}
-              testID="continue-create"
-              onPress={() => router.replace("/round-action")}
-            />
-          )}
-        </>
-      )}
-    </>
+        )}
+      </View>
+    </View>
   );
 }
 export function JoinRoundScreen() {
-  const { profile, t } = useSession(),
+  const { profile, t, lang } = useSession(),
     task = useTask();
   const [code, setCode] = useState(""),
     [result, setResult] = useState<Awaited<
@@ -737,6 +863,15 @@ export function JoinRoundScreen() {
   return (
     <>
       <Heading title={t("joinRound")} />
+      <FlowNote
+        title={
+          lang === "ko" ? "친구가 만든 방에 참여" : "Join your group’s room"
+        }
+      >
+        {lang === "ko"
+          ? "라운드 참여 코드를 입력하고 골프장과 생성자를 확인하세요. 개인 코드는 플레이어 연결에 사용합니다."
+          : "Enter the round code, then check the course and host. Personal codes are for linking players."}
+      </FlowNote>
       <Problem text={task.errorText} />
       <Field
         label={t("roundCode")}
@@ -785,7 +920,7 @@ export function JoinRoundScreen() {
   );
 }
 export function RoundActionScreen() {
-  const { profile, t } = useSession();
+  const { profile, t, lang } = useSession();
   const lifetime = useAdActionLifetime();
   const terminal = useRef<{ action: string; evidence: AdEvidence } | null>(
     null,
@@ -849,6 +984,24 @@ export function RoundActionScreen() {
   return (
     <>
       <Heading title={t("roundReview")} />
+      {data?.action.kind === "create" && <RoundSteps step={3} />}
+      {data && (
+        <FlowNote
+          title={
+            lang === "ko"
+              ? data.action.kind === "create"
+                ? "새 방을 만듭니다"
+                : "이 방에 기록 참여자로 들어갑니다"
+              : data.action.kind === "create"
+                ? "Create a new room"
+                : "Join as a recording participant"
+          }
+        >
+          {lang === "ko"
+            ? "참여 후 내가 기록할 플레이어를 선택할 수 있어요. 실제 플레이어 연결과 입력 대상 선택은 별개입니다."
+            : "After joining, choose whose scores you record. Player identity and your scoring list are separate."}
+        </FlowNote>
+      )}
       <Problem text={task.errorText || query.errorText} />
       {!data ? (
         <Button label={t("retry")} onPress={() => void query.reload()} />
@@ -924,7 +1077,7 @@ export function RoundActionScreen() {
   );
 }
 export function RoundScreen() {
-  const { t, lang } = useSession(),
+  const { t, lang, profile } = useSession(),
     { id } = useLocalSearchParams<{ id: string }>();
   const query = useLoad(() => golf.round(id)),
     task = useTask();
@@ -932,6 +1085,8 @@ export function RoundScreen() {
     [sent, setSent] = useState(false),
     [requestId, setRequestId] = useState(Crypto.randomUUID());
   const detail = query.data;
+  const scoring = useLoad(() => players.targets(id));
+  const me = detail?.players.find((p) => p.user_id === profile!.user_id);
   return (
     <>
       <Heading
@@ -975,14 +1130,50 @@ export function RoundScreen() {
             </Txt>
           </View>
           {detail.round.status === "active" && (
-            <Button
-              label={t("scoreEntry")}
-              icon={<Icon name="edit" size={20} color="#FFFFFF" />}
-              testID="enter-scores"
-              onPress={() =>
-                router.push({ pathname: "/scores", params: { id } })
-              }
-            />
+            <Card>
+              <Txt style={{ fontWeight: "800", fontSize: 18 }}>
+                {lang === "ko" ? "내 기록 준비" : "Ready to keep score"}
+              </Txt>
+              <Txt testID="round-my-role" style={layout.caption}>
+                {lang === "ko"
+                  ? me
+                    ? `플레이어 · ${me.name} / 기록 참여자`
+                    : "기록 참여자 · 내 플레이어 연결 없음"
+                  : me
+                    ? `Player · ${me.name} / Recorder`
+                    : "Recorder · no player linked to you"}
+              </Txt>
+              <Txt style={layout.caption}>
+                {lang === "ko"
+                  ? "내 입력 대상은 내가 점수를 작성할 사람입니다. 선택해도 플레이어의 사용자 연결은 바뀌지 않아요."
+                  : "Your scoring list selects whose scores you enter. It does not change their linked identity."}
+              </Txt>
+              <Button
+                label={t("scoreEntry")}
+                icon={<Icon name="edit" size={20} color="#FFFFFF" />}
+                testID="enter-scores"
+                onPress={() =>
+                  router.push({
+                    pathname: scoring.data?.slot_ids.length
+                      ? "/scores"
+                      : "/input-targets",
+                    params: { id },
+                  })
+                }
+              />
+              <Button
+                label={
+                  lang === "ko"
+                    ? `내 입력 대상 확인${scoring.data ? ` · ${scoring.data.slot_ids.length}명` : ""}`
+                    : "Choose scoring players"
+                }
+                secondary
+                testID="prepare-targets"
+                onPress={() =>
+                  router.push({ pathname: "/input-targets", params: { id } })
+                }
+              />
+            </Card>
           )}
           <Button
             label={t("scorecard")}
@@ -1006,7 +1197,7 @@ export function RoundScreen() {
             </>
           )}
           <SectionTitle
-            title={lang === "ko" ? "동반자와 기록 설정" : "Players & scoring"}
+            title={lang === "ko" ? "방 전체 설정" : "Shared room settings"}
           />
           <Card>
             <View style={{ gap: 8 }}>
@@ -1022,7 +1213,14 @@ export function RoundScreen() {
                       {String(i + 1).padStart(2, "0")}
                     </Txt>
                   </View>
-                  <Txt style={{ flex: 1, fontWeight: "600" }}>{p.name}</Txt>
+                  <Txt style={{ flex: 1, fontWeight: "600" }}>
+                    {p.name}
+                    {p.user_id === profile!.user_id
+                      ? lang === "ko"
+                        ? " · 나"
+                        : " · Me"
+                      : ""}
+                  </Txt>
                 </View>
               ))}
             </View>

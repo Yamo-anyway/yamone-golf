@@ -177,6 +177,7 @@ async function main() {
     await home(a.page);
     await a.page.getByTestId("new-round").click();
     await a.page.getByTestId("choose-" + course.course_id).click();
+    await a.page.getByTestId("setup-players").click();
     await a.page.getByTestId("add-player").click();
     await a.page.getByTestId("player-1").fill("동반자");
     await a.page.getByTestId("review-create").click();
