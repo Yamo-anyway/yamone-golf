@@ -30,7 +30,19 @@ async function main() {
     return page.evaluate(async (path) => (await fetch(path)).json(), path);
   }
   async function home(page: Page) {
-    await page.getByRole("tab", { name: "홈", exact: true }).click();
+    const homeTab = page.getByRole("tab", { name: "홈", exact: true });
+    // Task screens use the back arrow; tabs remain on the top-level screens.
+    for (let depth = 0; depth < 8 && !(await homeTab.isVisible()); depth++) {
+      const previous = page.url();
+      await page
+        .getByRole("button", { name: "돌아가기", exact: true })
+        .first()
+        .click();
+      await page.waitForURL((url) => url.href !== previous);
+    }
+    assert.ok(await homeTab.isVisible(), "back navigation reaches a main tab");
+    await homeTab.click();
+    await page.waitForURL(base + "/");
     await page.getByTestId("refresh-home").click();
   }
   async function snapshot(page: Page, name: string) {

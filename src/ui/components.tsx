@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useState } from "react";
 import {
   ActivityIndicator,
   Pressable,
@@ -6,31 +6,35 @@ import {
   Text,
   TextInput,
   View,
+  type StyleProp,
+  type ViewStyle,
 } from "react-native";
 export const colors = {
-  ink: "#173F34",
-  muted: "#566B60",
-  green: "#23634B",
-  mint: "#E7F0E7",
-  paper: "#F7F8F3",
-  line: "#D6DED5",
-  error: "#9D3030",
+  ink: "#163C34",
+  muted: "#68766F",
+  green: "#174E3F",
+  mint: "#E9EFE8",
+  lime: "#DAEE94",
+  paper: "#F5F6F2",
+  line: "#DFE5DE",
+  error: "#A13636",
+  white: "#FFFFFF",
 };
 export const styles = StyleSheet.create({
   text: { fontSize: 16, lineHeight: 24, color: colors.ink },
   title: {
-    fontSize: 30,
-    lineHeight: 39,
+    fontSize: 27,
+    lineHeight: 35,
     fontWeight: "800",
     color: colors.ink,
     letterSpacing: -0.5,
   },
   card: {
-    padding: 20,
+    padding: 18,
     backgroundColor: "#FFFFFF",
     borderWidth: 1,
     borderColor: colors.line,
-    borderRadius: 18,
+    borderRadius: 16,
     gap: 14,
   },
   row: {
@@ -40,13 +44,13 @@ export const styles = StyleSheet.create({
     flexWrap: "wrap",
   },
   input: {
-    minHeight: 54,
+    minHeight: 52,
     borderWidth: 1,
     borderColor: colors.line,
     borderRadius: 12,
     backgroundColor: "#FFFFFF",
     padding: 14,
-    fontSize: 17,
+    fontSize: 16,
     color: colors.ink,
   },
 });
@@ -57,8 +61,14 @@ export function Txt({ children, ...props }: React.ComponentProps<typeof Text>) {
     </Text>
   );
 }
-export function Card({ children }: { children: React.ReactNode }) {
-  return <View style={styles.card}>{children}</View>;
+export function Card({
+  children,
+  style,
+}: {
+  children: React.ReactNode;
+  style?: StyleProp<ViewStyle>;
+}) {
+  return <View style={[styles.card, style]}>{children}</View>;
 }
 export function Button({
   label,
@@ -67,6 +77,10 @@ export function Button({
   secondary,
   busy,
   testID,
+  quiet,
+  danger,
+  icon,
+  style,
 }: {
   label: string;
   onPress: () => void;
@@ -74,7 +88,24 @@ export function Button({
   secondary?: boolean;
   busy?: boolean;
   testID?: string;
+  quiet?: boolean;
+  danger?: boolean;
+  icon?: React.ReactNode;
+  style?: StyleProp<ViewStyle>;
 }) {
+  const subdued = secondary || quiet;
+  const foreground = subdued
+    ? danger
+      ? colors.error
+      : colors.ink
+    : colors.white;
+  const background = quiet
+    ? "transparent"
+    : secondary
+      ? colors.white
+      : danger
+        ? colors.error
+        : colors.green;
   return (
     <Pressable
       testID={testID}
@@ -83,26 +114,35 @@ export function Button({
       accessibilityState={{ disabled: !!disabled || !!busy, busy: !!busy }}
       disabled={disabled || busy}
       onPress={onPress}
-      style={({ pressed }) => ({
-        minHeight: 52,
-        padding: 14,
-        borderRadius: 12,
-        borderWidth: 1,
-        borderColor: secondary ? colors.line : colors.green,
-        backgroundColor: secondary ? "#FFFFFF" : colors.green,
-        opacity: disabled || busy ? 0.55 : pressed ? 0.8 : 1,
-        alignItems: "center",
-        justifyContent: "center",
-        flexDirection: "row",
-        gap: 8,
-      })}
+      style={({ pressed }) => [
+        {
+          minHeight: 52,
+          paddingHorizontal: 16,
+          paddingVertical: 12,
+          borderRadius: 12,
+          borderWidth: 1,
+          borderColor: quiet
+            ? "transparent"
+            : secondary
+              ? colors.line
+              : background,
+          backgroundColor: pressed && subdued ? colors.mint : background,
+          opacity: disabled ? 0.45 : pressed ? 0.86 : busy ? 0.7 : 1,
+          alignItems: "center",
+          justifyContent: "center",
+          flexDirection: "row",
+          gap: 8,
+        },
+        style,
+      ]}
     >
-      {busy && <ActivityIndicator color={secondary ? colors.ink : "#FFFFFF"} />}
+      {busy ? <ActivityIndicator color={foreground} /> : icon}
       <Txt
         style={{
-          color: secondary ? colors.ink : "#FFFFFF",
+          color: foreground,
           fontWeight: "700",
           textAlign: "center",
+          flexShrink: 1,
         }}
       >
         {label}
@@ -112,12 +152,54 @@ export function Button({
 }
 export function Field({
   label,
+  error,
+  style,
+  onFocus,
+  onBlur,
   ...props
-}: React.ComponentProps<typeof TextInput> & { label: string }) {
+}: React.ComponentProps<typeof TextInput> & { label: string; error?: string }) {
+  const [focused, setFocused] = useState(false);
   return (
     <View style={{ gap: 8 }}>
-      <Txt style={{ fontWeight: "700" }}>{label}</Txt>
-      <TextInput {...props} accessibilityLabel={label} style={styles.input} />
+      <Txt style={{ fontWeight: "600", fontSize: 14 }}>{label}</Txt>
+      <TextInput
+        {...props}
+        accessibilityLabel={props.accessibilityLabel ?? label}
+        accessibilityHint={error || props.accessibilityHint}
+        placeholderTextColor={colors.muted}
+        selectionColor={colors.green}
+        onFocus={(event) => {
+          setFocused(true);
+          onFocus?.(event);
+        }}
+        onBlur={(event) => {
+          setFocused(false);
+          onBlur?.(event);
+        }}
+        style={[
+          styles.input,
+          {
+            borderColor: error
+              ? colors.error
+              : focused
+                ? colors.green
+                : colors.line,
+          },
+          props.editable === false && {
+            backgroundColor: colors.paper,
+            color: colors.muted,
+          },
+          style,
+        ]}
+      />
+      {!!error && (
+        <Txt
+          accessibilityRole="alert"
+          style={{ color: colors.error, fontSize: 13 }}
+        >
+          {error}
+        </Txt>
+      )}
     </View>
   );
 }

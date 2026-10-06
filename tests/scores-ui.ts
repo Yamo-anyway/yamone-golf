@@ -283,11 +283,11 @@ async function main() {
         (s: any) => s.strokes === null,
       ),
     );
-    // Route push and shell navigation must both protect drafts.
+    // Route push and the task-screen back arrow must both protect drafts.
     await a.page.getByTestId("plus-" + self.slot_id).click();
     await a.page.getByTestId("open-scorecard").click();
     await a.page.getByTestId("keep-score-editing").click();
-    await a.page.getByRole("tab", { name: "홈", exact: true }).click();
+    await a.page.getByRole("button", { name: "돌아가기", exact: true }).click();
     await a.page.getByTestId("discard-and-move").click();
     await a.page.getByTestId("enter-scores").waitFor({ state: "hidden" });
     await a.page.waitForURL(base + "/");

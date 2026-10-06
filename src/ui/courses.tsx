@@ -1,4 +1,5 @@
 import { DragRow } from "./drag-row";
+import { Icon } from "./icons";
 import React, { useRef, useState } from "react";
 import { Linking, Pressable, View } from "react-native";
 import { router, useLocalSearchParams } from "expo-router";
@@ -17,15 +18,45 @@ export function Problem({ text }: { text: string }) {
 export function Heading({ title }: { title: string }) {
   const { t } = useSession();
   return (
-    <View style={{ gap: 12 }}>
-      <Button
-        label={t("back")}
-        secondary
+    <View
+      style={{
+        flexDirection: "row",
+        alignItems: "center",
+        gap: 10,
+        minHeight: 52,
+      }}
+    >
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel={t("back")}
         onPress={() =>
           router.canGoBack() ? router.back() : router.dismissTo("/")
         }
-      />
-      <Txt style={styles.title}>{title}</Txt>
+        style={({ pressed }) => ({
+          width: 48,
+          height: 48,
+          borderRadius: 16,
+          alignItems: "center",
+          justifyContent: "center",
+          backgroundColor: pressed ? colors.mint : "#FFFFFF",
+          borderWidth: 1,
+          borderColor: colors.line,
+        })}
+      >
+        <Icon name="chevron-left" size={22} color={colors.ink} />
+      </Pressable>
+      <Txt
+        accessibilityRole="header"
+        style={{
+          flex: 1,
+          fontSize: 23,
+          lineHeight: 30,
+          fontWeight: "800",
+          letterSpacing: -0.6,
+        }}
+      >
+        {title}
+      </Txt>
     </View>
   );
 }
@@ -104,9 +135,33 @@ export function CoursesScreen() {
     );
     return (
       <>
-        <Txt style={{ fontSize: 21, lineHeight: 29, fontWeight: "700" }}>
-          {c.name}
-        </Txt>
+        <View
+          style={{ flexDirection: "row", gap: 12, alignItems: "flex-start" }}
+        >
+          <View
+            style={{
+              width: 44,
+              height: 44,
+              borderRadius: 14,
+              backgroundColor: colors.mint,
+              alignItems: "center",
+              justifyContent: "center",
+            }}
+          >
+            <Icon name="flag" size={23} color={colors.green} />
+          </View>
+          <Txt
+            style={{
+              flex: 1,
+              fontSize: 20,
+              lineHeight: 28,
+              fontWeight: "800",
+              letterSpacing: -0.4,
+            }}
+          >
+            {c.name}
+          </Txt>
+        </View>
         <Txt style={{ color: colors.muted }}>
           {[
             c.city || c.region,
@@ -181,7 +236,8 @@ export function CoursesScreen() {
             </View>
             <Button
               label={t("removeMine")}
-              secondary
+              quiet
+              danger
               disabled={task.busy}
               onPress={() =>
                 void confirm(
@@ -228,6 +284,8 @@ export function CoursesScreen() {
         <>
           <Field
             label={t("searchHint")}
+            placeholder={t("courseName")}
+            returnKeyType="search"
             value={query}
             onChangeText={setQuery}
             testID="course-search"
@@ -244,13 +302,15 @@ export function CoursesScreen() {
           <Txt style={{ color: colors.muted }}>{t("sortHint")}</Txt>
           <Button
             label={t("refresh")}
-            secondary
+            quiet
             onPress={() => void mine.reload()}
           />
         </>
       )}
       <Button
         label={t("newCourse")}
+        secondary
+        icon={<Icon name="plus" size={20} color={colors.green} />}
         testID="new-course"
         onPress={() => router.push("/course-edit")}
       />

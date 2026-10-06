@@ -52,14 +52,26 @@ async function main() {
       return;
     }
     const box = (await page.getByTestId("ad-banner").boundingBox())!;
-    const nav = (await page.getByTestId("bottom-navigation").boundingBox())!;
+    const navigation = page.getByTestId("bottom-navigation");
+    const nav = (await navigation.isVisible())
+      ? await navigation.boundingBox()
+      : null;
     const scroll = (await page.getByTestId("screen-scroll").boundingBox())!;
     assert.equal(box.height, 50);
     assert.ok(
       scroll.y + scroll.height <= box.y + 1,
       "banner does not cover scroll content",
     );
-    assert.ok(box.y + box.height <= nav.y + 1, "banner stays above navigation");
+    if (nav)
+      assert.ok(
+        box.y + box.height <= nav.y + 1,
+        "banner stays above navigation",
+      );
+    else
+      assert.ok(
+        Math.abs(box.y + box.height - page.viewportSize()!.height) < 2,
+        "task-screen banner stays at the viewport bottom without navigation",
+      );
     await page.getByTestId("screen-scroll").evaluate((el) => {
       el.scrollTop = 10000;
     });
@@ -172,7 +184,11 @@ async function main() {
       "round-records",
     ]) {
       await page.goto(base + "/" + route + "?id=" + round.round_id);
-      await page.getByTestId("bottom-navigation").waitFor();
+      await page
+        .getByRole("button", { name: "돌아가기", exact: true })
+        .first()
+        .waitFor();
+      assert.equal(await page.getByTestId("bottom-navigation").count(), 0);
       await banner(page, false);
     }
     for (const route of [
@@ -183,7 +199,15 @@ async function main() {
       "profile",
     ]) {
       await page.goto(base + "/" + route);
-      await page.getByTestId("bottom-navigation").waitFor();
+      if (route === "courses" || route === "profile")
+        await page.getByTestId("bottom-navigation").waitFor();
+      else {
+        await page
+          .getByRole("button", { name: "돌아가기", exact: true })
+          .first()
+          .waitFor();
+        assert.equal(await page.getByTestId("bottom-navigation").count(), 0);
+      }
       await banner(page, false);
     }
     await page.goto(base);
@@ -237,7 +261,11 @@ async function main() {
       "/record-edit?id=" + receipt.receipt_id,
     ]) {
       await page.goto(base + route);
-      await page.getByTestId("bottom-navigation").waitFor();
+      await page
+        .getByRole("button", { name: "돌아가기", exact: true })
+        .first()
+        .waitFor();
+      assert.equal(await page.getByTestId("bottom-navigation").count(), 0);
       await banner(page, false);
     }
     await page.goto(base + "/record?id=" + receipt.receipt_id);
@@ -247,10 +275,10 @@ async function main() {
     await page.reload();
     await page.getByTestId("edit-own-scores").waitFor();
     await banner(page, false);
-    const nav = (await page.getByTestId("bottom-navigation").boundingBox())!;
+    assert.equal(await page.getByTestId("bottom-navigation").count(), 0);
     const scroll = (await page.getByTestId("screen-scroll").boundingBox())!;
     assert.ok(
-      Math.abs(scroll.y + scroll.height - nav.y) < 2,
+      Math.abs(scroll.y + scroll.height - page.viewportSize()!.height) < 2,
       "failed banner leaves no blank area",
     );
     await snapshot(page, "banner-failure-no-gap");

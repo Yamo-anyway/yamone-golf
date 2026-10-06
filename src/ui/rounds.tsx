@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from "react";
-import { View } from "react-native";
+import { Pressable, StyleSheet, View } from "react-native";
 import { router, useLocalSearchParams } from "expo-router";
 import * as Crypto from "expo-crypto";
 import {
@@ -19,20 +19,200 @@ import { useOfflineScores } from "./offline-scores";
 import { useSession } from "./session";
 import { Button, Card, colors, Field, styles, Txt } from "./components";
 import { Heading, Problem } from "./courses";
+import { Icon } from "./icons";
 import { confirm, useDraftGuard, useLoad, useTask } from "./golf-hooks";
-function CourseSummary({ course, holes }: { course: Course; holes: number }) {
+const layout = StyleSheet.create({
+  hero: {
+    backgroundColor: "#174E3F",
+    borderRadius: 24,
+    padding: 22,
+    gap: 18,
+    overflow: "hidden",
+  },
+  eyebrow: {
+    fontSize: 12,
+    lineHeight: 18,
+    fontWeight: "700",
+    letterSpacing: 1.2,
+  },
+  sectionTitle: {
+    fontSize: 20,
+    lineHeight: 28,
+    fontWeight: "800",
+    letterSpacing: -0.4,
+  },
+  sectionHead: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 12,
+    marginTop: 8,
+  },
+  pill: {
+    alignSelf: "flex-start",
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    borderRadius: 20,
+    paddingHorizontal: 11,
+    paddingVertical: 5,
+    backgroundColor: "#DAEE94",
+  },
+  lightPill: {
+    alignSelf: "flex-start",
+    borderRadius: 16,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    backgroundColor: "#EDF3EC",
+  },
+  caption: { fontSize: 13, lineHeight: 20, color: colors.muted },
+  rowAction: {
+    minHeight: 56,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    paddingVertical: 10,
+  },
+  iconTile: {
+    width: 42,
+    height: 42,
+    borderRadius: 13,
+    backgroundColor: "#EDF3EC",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  divider: { height: 1, backgroundColor: colors.line },
+  person: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    minHeight: 42,
+  },
+  avatar: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "#EDF3EC",
+  },
+});
+function SectionTitle({ title, count }: { title: string; count?: number }) {
+  return (
+    <View style={layout.sectionHead}>
+      <Txt accessibilityRole="header" style={layout.sectionTitle}>
+        {title}
+      </Txt>
+      {count !== undefined && (
+        <View style={layout.lightPill}>
+          <Txt style={{ fontSize: 13, lineHeight: 20, fontWeight: "700" }}>
+            {count}
+          </Txt>
+        </View>
+      )}
+    </View>
+  );
+}
+function RoundRowAction({
+  label,
+  detail,
+  icon,
+  onPress,
+  testID,
+  disabled,
+  danger,
+}: {
+  label: string;
+  detail?: string;
+  icon: React.ComponentProps<typeof Icon>["name"];
+  onPress: () => void;
+  testID?: string;
+  disabled?: boolean;
+  danger?: boolean;
+}) {
+  return (
+    <Pressable
+      testID={testID}
+      accessibilityRole="button"
+      accessibilityLabel={label}
+      accessibilityState={{ disabled: !!disabled }}
+      disabled={disabled}
+      onPress={onPress}
+      style={({ pressed }) => [
+        layout.rowAction,
+        { opacity: disabled ? 0.45 : pressed ? 0.65 : 1 },
+      ]}
+    >
+      <View style={[layout.iconTile, danger && { backgroundColor: "#FFF1ED" }]}>
+        <Icon
+          name={icon}
+          size={21}
+          color={danger ? colors.error : colors.green}
+        />
+      </View>
+      <View style={{ flex: 1, gap: 2 }}>
+        <Txt
+          style={{
+            fontWeight: "700",
+            color: danger ? colors.error : colors.ink,
+          }}
+        >
+          {label}
+        </Txt>
+        {!!detail && <Txt style={layout.caption}>{detail}</Txt>}
+      </View>
+      <Icon
+        name="chevron-right"
+        size={18}
+        color={danger ? colors.error : colors.muted}
+      />
+    </Pressable>
+  );
+}
+function CourseSummary({
+  course,
+  holes,
+  inverted = false,
+}: {
+  course: Course;
+  holes: number;
+  inverted?: boolean;
+}) {
   const { t } = useSession();
   return (
-    <>
-      <Txt style={{ fontSize: 22, lineHeight: 30, fontWeight: "700" }}>
+    <View style={{ gap: 8 }}>
+      <Txt
+        style={{
+          fontSize: 24,
+          lineHeight: 32,
+          fontWeight: "800",
+          letterSpacing: -0.5,
+          color: inverted ? "#FFFFFF" : colors.ink,
+        }}
+      >
         {course.name}
       </Txt>
-      <Txt style={{ color: colors.muted }}>
-        {course.region} · {holes}
-        {t("hole")}
+      <Txt
+        style={{
+          fontSize: 14,
+          lineHeight: 21,
+          color: inverted ? "#CEE0D7" : colors.muted,
+        }}
+      >
+        {[course.region, `${holes} ${t("hole")}`].filter(Boolean).join(" · ")}
       </Txt>
-      <Txt>{course.segments.map((s) => s.name).join(" → ")}</Txt>
-    </>
+      {!!course.segments.length && (
+        <Txt
+          style={{
+            fontSize: 14,
+            lineHeight: 21,
+            color: inverted ? "#CEE0D7" : colors.muted,
+          }}
+        >
+          {course.segments.map((s) => s.name).join(" → ")}
+        </Txt>
+      )}
+    </View>
   );
 }
 async function begin(user: string, input: CreateInput | JoinInput) {
@@ -79,7 +259,7 @@ function OfflineRounds({ unavailable }: { unavailable: boolean }) {
   );
 }
 export function HomeRounds() {
-  const { profile, t } = useSession();
+  const { profile, t, lang } = useSession();
   const task = useLoad(async () => ({
     home: await golf.home(),
     pending: await pendingRound.read(profile!.user_id),
@@ -91,7 +271,10 @@ export function HomeRounds() {
       <Problem text={task.errorText} />
       {task.data?.pending && (
         <Card>
-          <Txt style={{ fontWeight: "700" }}>{t("pendingRound")}</Txt>
+          <View style={styles.row}>
+            <Icon name="clock" size={20} color={colors.green} />
+            <Txt style={{ fontWeight: "700" }}>{t("pendingRound")}</Txt>
+          </View>
           <Button
             label={t("resumeRound")}
             testID="resume-round"
@@ -100,54 +283,154 @@ export function HomeRounds() {
         </Card>
       )}
       {home?.active_round ? (
-        <Card>
-          <Txt>{t("currentRound")}</Txt>
+        <View style={layout.hero}>
+          <View
+            style={{
+              flexDirection: "row",
+              alignItems: "center",
+              justifyContent: "space-between",
+            }}
+          >
+            <View style={layout.pill}>
+              <View
+                style={{
+                  width: 6,
+                  height: 6,
+                  borderRadius: 3,
+                  backgroundColor: "#174E3F",
+                }}
+              />
+              <Txt
+                style={{
+                  fontSize: 12,
+                  lineHeight: 18,
+                  fontWeight: "800",
+                  color: "#174E3F",
+                }}
+              >
+                {t("currentRound")}
+              </Txt>
+            </View>
+            <Icon name="flag" size={28} color="#DAEE94" />
+          </View>
           <CourseSummary
             course={home.active_round.course}
             holes={home.active_round.hole_count}
+            inverted
           />
-          <Button
-            label={t("openRound")}
+          <Pressable
             testID="open-round"
+            accessibilityRole="button"
+            accessibilityLabel={t("openRound")}
             onPress={() =>
               router.push({
                 pathname: "/round",
                 params: { id: home.active_round!.round_id },
               })
             }
-          />
-          <Txt style={{ color: colors.muted }}>{t("singleRoundHelp")}</Txt>
-        </Card>
+            style={({ pressed }) => ({
+              minHeight: 54,
+              paddingHorizontal: 18,
+              paddingVertical: 14,
+              borderRadius: 15,
+              backgroundColor: "#DAEE94",
+              opacity: pressed ? 0.8 : 1,
+              flexDirection: "row",
+              alignItems: "center",
+              justifyContent: "space-between",
+              gap: 12,
+            })}
+          >
+            <Txt style={{ fontWeight: "800", color: "#174E3F" }}>
+              {t("openRound")}
+            </Txt>
+            <Icon name="chevron-right" size={20} color="#174E3F" />
+          </Pressable>
+          <Txt style={{ fontSize: 12, lineHeight: 19, color: "#CEE0D7" }}>
+            {t("singleRoundHelp")}
+          </Txt>
+        </View>
       ) : (
         <Card>
+          <View
+            style={{
+              flexDirection: "row",
+              alignItems: "center",
+              justifyContent: "space-between",
+              gap: 12,
+            }}
+          >
+            <View style={{ flex: 1, gap: 6 }}>
+              <Txt style={[layout.eyebrow, { color: colors.muted }]}>
+                LET’S PLAY
+              </Txt>
+              <Txt
+                accessibilityRole="header"
+                style={{
+                  fontSize: 25,
+                  lineHeight: 34,
+                  letterSpacing: -0.6,
+                  fontWeight: "800",
+                }}
+              >
+                {lang === "ko"
+                  ? "오늘의 라운드를\n시작해 볼까요?"
+                  : "Ready for your\nnext round?"}
+              </Txt>
+            </View>
+            <View
+              style={{
+                width: 64,
+                height: 64,
+                borderRadius: 22,
+                backgroundColor: "#DAEE94",
+                alignItems: "center",
+                justifyContent: "center",
+              }}
+            >
+              <Icon name="flag" size={32} color="#174E3F" />
+            </View>
+          </View>
+          <Txt style={layout.caption}>
+            {lang === "ko"
+              ? "골프장을 고르고 동반자와 함께 기록하세요."
+              : "Choose a course and keep score together."}
+          </Txt>
           <Button
             label={t("newRound")}
+            icon={<Icon name="plus" size={20} color="#FFFFFF" />}
             testID="new-round"
             disabled={!home || task.busy || !!task.data?.pending}
             onPress={() =>
               router.push({ pathname: "/courses", params: { select: "1" } })
             }
           />
-          <Button
+          <RoundRowAction
             label={t("joinRound")}
+            detail={
+              lang === "ko"
+                ? "전달받은 라운드 코드로 참여"
+                : "Join using your round code"
+            }
+            icon="user"
             testID="join-round"
-            secondary
             disabled={!home || task.busy || !!task.data?.pending}
             onPress={() => router.push("/round-join")}
           />
         </Card>
       )}
       {!!home?.invitations.length && (
-        <Txt style={{ fontSize: 22, lineHeight: 30, fontWeight: "700" }}>
-          {t("invitations")}
-        </Txt>
+        <SectionTitle
+          title={t("invitations")}
+          count={home.invitations.length}
+        />
       )}
       {home?.invitations.map((invite) => (
         <Card key={invite.invitation_id}>
-          <CourseSummary course={invite.course} holes={invite.hole_count} />
-          <Txt>
-            {t("invitedBy")}: {invite.sender_name}
+          <Txt style={layout.caption}>
+            {t("invitedBy")} · {invite.sender_name}
           </Txt>
+          <CourseSummary course={invite.course} holes={invite.hole_count} />
           <Button
             label={t("acceptInvite")}
             testID={"accept-" + invite.invitation_id}
@@ -161,11 +444,18 @@ export function HomeRounds() {
               )
             }
           />
-          <Button
-            label={t("declineInvite")}
-            secondary
+          <Pressable
             testID={"decline-" + invite.invitation_id}
+            accessibilityRole="button"
+            accessibilityLabel={t("declineInvite")}
+            accessibilityState={{ disabled: task.busy }}
             disabled={task.busy}
+            style={({ pressed }) => ({
+              minHeight: 48,
+              justifyContent: "center",
+              alignItems: "center",
+              opacity: task.busy ? 0.45 : pressed ? 0.6 : 1,
+            })}
             onPress={() =>
               void confirm(
                 t("declineConfirm"),
@@ -179,40 +469,62 @@ export function HomeRounds() {
                   });
               })
             }
-          />
+          >
+            <Txt
+              style={{ color: colors.muted, fontWeight: "600", fontSize: 14 }}
+            >
+              {t("declineInvite")}
+            </Txt>
+          </Pressable>
         </Card>
       ))}
       <RecordsHomeEntry />
       {!!home?.ended_rounds?.length && (
-        <Txt style={{ fontWeight: "700" }}>{t("recentEndedRounds")}</Txt>
+        <SectionTitle title={t("recentEndedRounds")} />
       )}
-      {home?.ended_rounds?.map((r) => (
-        <Card key={r.round_id}>
-          <Txt>
-            {r.course.name} · {r.hole_count} {t("hole")}
-          </Txt>
-          <Button
-            label={t("roundEndedTitle")}
-            secondary
-            testID={"ended-round-" + r.round_id}
-            onPress={() =>
-              router.push({ pathname: "/round", params: { id: r.round_id } })
-            }
-          />
+      {!!home?.ended_rounds?.length && (
+        <Card>
+          {home.ended_rounds.map((r, i) => (
+            <React.Fragment key={r.round_id}>
+              {i > 0 && <View style={layout.divider} />}
+              <RoundRowAction
+                label={r.course.name}
+                detail={`${r.hole_count} ${t("hole")} · ${t("roundEndedTitle")}`}
+                icon="scorecard"
+                testID={"ended-round-" + r.round_id}
+                onPress={() =>
+                  router.push({
+                    pathname: "/round",
+                    params: { id: r.round_id },
+                  })
+                }
+              />
+            </React.Fragment>
+          ))}
         </Card>
-      ))}
-      <Button
-        label={t("courses")}
-        secondary
-        testID="courses"
-        onPress={() => router.push("/courses")}
-      />
-      <Button
-        label={t("refresh")}
-        secondary
+      )}
+      <Card>
+        <RoundRowAction
+          label={t("courses")}
+          icon="flag"
+          testID="courses"
+          onPress={() => router.push("/courses")}
+        />
+      </Card>
+      <Pressable
         testID="refresh-home"
+        accessibilityRole="button"
+        accessibilityLabel={t("refresh")}
         onPress={() => void task.reload()}
-      />
+        style={({ pressed }) => ({
+          minHeight: 48,
+          alignItems: "center",
+          justifyContent: "center",
+          opacity: pressed ? 0.6 : 1,
+        })}
+      >
+        <Txt style={{ color: colors.muted, fontSize: 13 }}>{t("refresh")}</Txt>
+      </Pressable>
     </>
   );
 }
@@ -248,15 +560,50 @@ export function NewRoundScreen() {
       <Card>
         <Txt style={{ fontWeight: "700" }}>{label}</Txt>
         {current!.segments.map((s, i) => (
-          <Button
+          <Pressable
             key={i}
-            label={`${s.name} · PAR ${s.pars.reduce((a, b) => a + b, 0)}`}
-            secondary={value !== i}
+            accessibilityRole="radio"
+            accessibilityLabel={`${s.name} · PAR ${s.pars.reduce((a, b) => a + b, 0)}`}
+            accessibilityState={{ checked: value === i }}
             onPress={() => {
               touch();
               onSelect(i);
             }}
-          />
+            style={({ pressed }) => ({
+              minHeight: 56,
+              borderRadius: 14,
+              paddingHorizontal: 14,
+              paddingVertical: 12,
+              borderWidth: 1,
+              borderColor: value === i ? colors.green : colors.line,
+              backgroundColor: value === i ? "#EDF3EC" : "#FFFFFF",
+              opacity: pressed ? 0.7 : 1,
+              flexDirection: "row",
+              alignItems: "center",
+              gap: 12,
+            })}
+          >
+            <View style={{ flex: 1 }}>
+              <Txt style={{ fontWeight: "700" }}>{s.name}</Txt>
+              <Txt style={layout.caption}>
+                PAR {s.pars.reduce((a, b) => a + b, 0)}
+              </Txt>
+            </View>
+            <View
+              style={{
+                width: 23,
+                height: 23,
+                borderRadius: 12,
+                borderWidth: value === i ? 0 : 1.5,
+                borderColor: colors.line,
+                backgroundColor: value === i ? colors.green : "#FFFFFF",
+                alignItems: "center",
+                justifyContent: "center",
+              }}
+            >
+              {value === i && <Icon name="check" size={15} color="#FFFFFF" />}
+            </View>
+          </Pressable>
         ))}
       </Card>
     );
@@ -272,7 +619,7 @@ export function NewRoundScreen() {
           <Card>
             <CourseSummary course={current} holes={holes} />
           </Card>
-          <Txt style={{ fontWeight: "700" }}>{t("playedHoles")}</Txt>
+          <SectionTitle title={t("playedHoles")} />
           <View style={styles.row}>
             {([9, 18] as const).map((n) => (
               <View key={n} style={{ flex: 1 }}>
@@ -289,12 +636,12 @@ export function NewRoundScreen() {
           </View>
           {selectHalf(t("frontNine"), front, setFront)}
           {holes === 18 && selectHalf(t("backNine"), back, setBack)}
-          {holes === 18 && <Txt>{t("repeatNine")}</Txt>}
+          {holes === 18 && <Txt style={layout.caption}>{t("repeatNine")}</Txt>}
           <Card>
             <Txt style={{ fontSize: 21, lineHeight: 29, fontWeight: "700" }}>
               {t("players")}
             </Txt>
-            <Txt>{t("recorderHelp")}</Txt>
+            <Txt style={layout.caption}>{t("recorderHelp")}</Txt>
             <Button
               label={`${self ? "✓ " : ""}${t("selfPlay")}`}
               secondary={!self}
@@ -320,6 +667,7 @@ export function NewRoundScreen() {
             {names.length < 8 && (
               <Button
                 label={t("addPlayer")}
+                icon={<Icon name="plus" size={18} color={colors.green} />}
                 secondary
                 testID="add-player"
                 onPress={() => {
@@ -331,6 +679,7 @@ export function NewRoundScreen() {
             {names.length > 1 && (
               <Button
                 label={t("removePlayer")}
+                quiet
                 secondary
                 onPress={() => {
                   touch();
@@ -341,6 +690,7 @@ export function NewRoundScreen() {
           </Card>
           <Button
             label={t("reviewCreate")}
+            icon={<Icon name="chevron-right" size={19} color="#FFFFFF" />}
             testID="review-create"
             busy={task.busy}
             disabled={names.some((n) => !n.trim())}
@@ -574,7 +924,7 @@ export function RoundActionScreen() {
   );
 }
 export function RoundScreen() {
-  const { t } = useSession(),
+  const { t, lang } = useSession(),
     { id } = useLocalSearchParams<{ id: string }>();
   const query = useLoad(() => golf.round(id)),
     task = useTask();
@@ -592,53 +942,57 @@ export function RoundScreen() {
       <Problem text={task.errorText || query.errorText} />
       {detail && (
         <>
-          <Card>
+          <View style={layout.hero}>
+            <View style={layout.pill}>
+              <Icon
+                name={detail.round.status === "active" ? "flag" : "check"}
+                size={14}
+                color="#174E3F"
+              />
+              <Txt
+                style={{
+                  fontSize: 12,
+                  lineHeight: 18,
+                  fontWeight: "800",
+                  color: "#174E3F",
+                }}
+              >
+                {t(
+                  detail.round.status === "active"
+                    ? "currentRound"
+                    : "roundEndedTitle",
+                )}
+              </Txt>
+            </View>
             <CourseSummary
               course={detail.round.course}
               holes={detail.round.hole_count}
+              inverted
             />
-            {detail.round.status === "active" && (
-              <>
-                <Txt>{t("roundCode")}</Txt>
-                <Txt
-                  selectable
-                  testID="round-code"
-                  style={{
-                    fontSize: 25,
-                    lineHeight: 33,
-                    fontWeight: "800",
-                    letterSpacing: 1,
-                  }}
-                >
-                  {detail.round.join_code}
-                </Txt>
-                <Txt>{t("selectHint")}</Txt>
-              </>
-            )}
-          </Card>
-          <Card>
-            <Txt style={{ fontWeight: "700" }}>
-              {t("participants")} · {detail.participants.length}
+            <Txt style={{ color: "#CEE0D7", fontSize: 13, lineHeight: 20 }}>
+              {t("players")} {detail.players.length} · {t("participants")}{" "}
+              {detail.participants.length}
             </Txt>
-            {detail.participants.map((p) => (
-              <Txt key={p.user_id}>
-                {p.nickname}
-                {p.user_id === detail.round.creator_id
-                  ? " · " + t("creator")
-                  : ""}
-              </Txt>
-            ))}
-          </Card>
-          <Card>
-            <Txt style={{ fontWeight: "700" }}>
-              {t("players")} · {detail.players.length}
-            </Txt>
-            {detail.players.map((p, i) => (
-              <Txt key={p.slot_id}>
-                {i + 1}. {p.name}
-              </Txt>
-            ))}
-          </Card>
+          </View>
+          {detail.round.status === "active" && (
+            <Button
+              label={t("scoreEntry")}
+              icon={<Icon name="edit" size={20} color="#FFFFFF" />}
+              testID="enter-scores"
+              onPress={() =>
+                router.push({ pathname: "/scores", params: { id } })
+              }
+            />
+          )}
+          <Button
+            label={t("scorecard")}
+            icon={<Icon name="scorecard" size={20} color={colors.green} />}
+            testID="round-scorecard"
+            secondary
+            onPress={() =>
+              router.push({ pathname: "/scorecard", params: { id } })
+            }
+          />
           {detail.round.status === "ended" && (
             <>
               <EndedRoundSummary id={id} />
@@ -651,44 +1005,121 @@ export function RoundScreen() {
               />
             </>
           )}
-          {detail.round.status === "active" && (
-            <Button
-              label={t("scoreEntry")}
-              testID="enter-scores"
+          <SectionTitle
+            title={lang === "ko" ? "동반자와 기록 설정" : "Players & scoring"}
+          />
+          <Card>
+            <View style={{ gap: 8 }}>
+              <Txt
+                style={{ fontSize: 13, fontWeight: "700", color: colors.muted }}
+              >
+                {t("players")} · {detail.players.length}
+              </Txt>
+              {detail.players.map((p, i) => (
+                <View key={p.slot_id} style={layout.person}>
+                  <View style={layout.avatar}>
+                    <Txt style={{ fontSize: 12, fontWeight: "700" }}>
+                      {String(i + 1).padStart(2, "0")}
+                    </Txt>
+                  </View>
+                  <Txt style={{ flex: 1, fontWeight: "600" }}>{p.name}</Txt>
+                </View>
+              ))}
+            </View>
+            <View style={layout.divider} />
+            <RoundRowAction
+              label={t("playerManagement")}
+              icon="user"
+              testID="manage-players"
               onPress={() =>
-                router.push({ pathname: "/scores", params: { id } })
+                router.push({ pathname: "/players", params: { id } })
               }
             />
-          )}
-          <Button
-            label={t("scorecard")}
-            testID="round-scorecard"
-            secondary
-            onPress={() =>
-              router.push({ pathname: "/scorecard", params: { id } })
-            }
-          />
-          <Button
-            label={t("playerManagement")}
-            testID="manage-players"
-            secondary
-            onPress={() =>
-              router.push({ pathname: "/players", params: { id } })
-            }
-          />
+            {detail.round.status === "active" && (
+              <>
+                <View style={layout.divider} />
+                <RoundRowAction
+                  label={t("inputTargets")}
+                  icon="scorecard"
+                  testID="input-targets"
+                  onPress={() =>
+                    router.push({ pathname: "/input-targets", params: { id } })
+                  }
+                />
+              </>
+            )}
+          </Card>
+          <Card>
+            <Txt style={{ fontWeight: "700" }}>
+              {t("participants")} · {detail.participants.length}
+            </Txt>
+            {detail.participants.map((p) => (
+              <View
+                key={p.user_id}
+                style={{
+                  flexDirection: "row",
+                  alignItems: "center",
+                  gap: 10,
+                  minHeight: 32,
+                }}
+              >
+                <Txt style={{ flex: 1 }}>{p.nickname}</Txt>
+                {p.user_id === detail.round.creator_id && (
+                  <View style={layout.lightPill}>
+                    <Txt
+                      style={{
+                        fontSize: 11,
+                        lineHeight: 18,
+                        fontWeight: "700",
+                      }}
+                    >
+                      {t("creator")}
+                    </Txt>
+                  </View>
+                )}
+              </View>
+            ))}
+          </Card>
           {detail.round.status === "active" && (
             <>
-              <Button
-                label={t("inputTargets")}
-                testID="input-targets"
-                secondary
-                onPress={() =>
-                  router.push({ pathname: "/input-targets", params: { id } })
-                }
+              <SectionTitle
+                title={lang === "ko" ? "함께 참여하기" : "Invite your group"}
               />
               <Card>
+                <Txt
+                  style={{
+                    fontSize: 13,
+                    color: colors.muted,
+                    fontWeight: "700",
+                  }}
+                >
+                  {t("roundCode")}
+                </Txt>
+                <View
+                  style={{
+                    borderRadius: 14,
+                    paddingVertical: 16,
+                    paddingHorizontal: 18,
+                    backgroundColor: "#F5F6F2",
+                  }}
+                >
+                  <Txt
+                    selectable
+                    testID="round-code"
+                    style={{
+                      fontSize: 27,
+                      lineHeight: 36,
+                      fontWeight: "800",
+                      letterSpacing: 2,
+                    }}
+                  >
+                    {detail.round.join_code}
+                  </Txt>
+                </View>
+                <Txt style={layout.caption}>{t("selectHint")}</Txt>
+                <View style={layout.divider} />
                 <Txt style={{ fontWeight: "700" }}>{t("sendInvite")}</Txt>
-                <Txt>{t("inviteHelp")}</Txt>
+                <Txt style={layout.caption}>{t("inviteHelp")}</Txt>
                 <Field
                   label={t("inviteCode")}
                   testID="invite-code"
@@ -706,6 +1137,7 @@ export function RoundScreen() {
                 <Button
                   label={t("sendInvite")}
                   testID="send-invite"
+                  secondary
                   busy={task.busy}
                   disabled={!code.trim() || sent}
                   onPress={() =>
@@ -715,29 +1147,47 @@ export function RoundScreen() {
                     })
                   }
                 />
-                {sent && <Txt accessibilityRole="alert">{t("inviteSent")}</Txt>}
+                {sent && (
+                  <Txt
+                    accessibilityRole="alert"
+                    style={{ color: colors.green, fontWeight: "700" }}
+                  >
+                    {t("inviteSent")}
+                  </Txt>
+                )}
               </Card>
-              <Txt style={{ color: colors.muted }}>
-                {t("roundActivityHelp")}
-              </Txt>
-              <Button
-                label={t("endRound")}
-                testID="end-round"
-                secondary
-                onPress={() =>
-                  router.push({ pathname: "/round-ending", params: { id } })
-                }
-              />
+              <View style={{ marginTop: 12, gap: 12 }}>
+                <Txt style={layout.caption}>{t("roundActivityHelp")}</Txt>
+                <Card>
+                  <RoundRowAction
+                    label={t("endRound")}
+                    icon="flag"
+                    testID="end-round"
+                    danger
+                    onPress={() =>
+                      router.push({ pathname: "/round-ending", params: { id } })
+                    }
+                  />
+                </Card>
+              </View>
             </>
           )}
         </>
       )}
-      <Button
-        label={t("refresh")}
+      <Pressable
         testID="refresh-round"
-        secondary
+        accessibilityRole="button"
+        accessibilityLabel={t("refresh")}
         onPress={() => void query.reload()}
-      />
+        style={({ pressed }) => ({
+          minHeight: 48,
+          justifyContent: "center",
+          alignItems: "center",
+          opacity: pressed ? 0.6 : 1,
+        })}
+      >
+        <Txt style={{ color: colors.muted, fontSize: 13 }}>{t("refresh")}</Txt>
+      </Pressable>
     </>
   );
 }
