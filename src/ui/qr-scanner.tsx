@@ -7,10 +7,13 @@ import { useIsFocused } from "expo-router/react-navigation";
 import { Button, colors, Txt } from "./components";
 import { useSession } from "./session";
 import { normalizePersonalCode } from "../../shared/personal-code";
+import { normalizeRoundCode } from "../../shared/round-code";
 export function QRScanner({
   onCode,
   onClose,
+  kind = "personal",
 }: {
+  kind?: "personal" | "round";
   onCode: (code: string) => void;
   onClose: () => void;
 }) {
@@ -35,9 +38,9 @@ export function QRScanner({
         style={{ flex: 1, backgroundColor: colors.paper, padding: 22, gap: 18 }}
       >
         <Txt style={{ fontSize: 24, lineHeight: 32, fontWeight: "700" }}>
-          {t("qrScan")}
+          {t(kind === "round" ? "roundQRScan" : "qrScan")}
         </Txt>
-        <Txt>{t("qrScanHelp")}</Txt>
+        <Txt>{t(kind === "round" ? "roundQRScanHelp" : "qrScanHelp")}</Txt>
         {!permission ? (
           <Txt>{t("loading")}</Txt>
         ) : !permission.granted ? (
@@ -61,8 +64,10 @@ export function QRScanner({
             barcodeScannerSettings={{ barcodeTypes: ["qr"] }}
             onMountError={() => setError(true)}
             onBarcodeScanned={(event) => {
-              if (accepted.current) return;
-              const code = normalizePersonalCode(event.data);
+              if (accepted.current || !active || !focused) return;
+              const code = (
+                kind === "round" ? normalizeRoundCode : normalizePersonalCode
+              )(event.data);
               if (!code) {
                 setInvalid(true);
                 return;
@@ -75,7 +80,11 @@ export function QRScanner({
           <View style={{ flex: 1 }} />
         )}
         {invalid && (
-          <Txt accessibilityRole="alert">{t("invalid_personal_code")}</Txt>
+          <Txt accessibilityRole="alert">
+            {t(
+              kind === "round" ? "invalid_round_code" : "invalid_personal_code",
+            )}
+          </Txt>
         )}
         {error && <Txt accessibilityRole="alert">{t("cameraUnavailable")}</Txt>}
         <Button label={t("closeScan")} secondary onPress={onClose} />

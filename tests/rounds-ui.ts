@@ -30,7 +30,19 @@ async function main() {
     return page.evaluate(async (path) => (await fetch(path)).json(), path);
   }
   async function home(page: Page) {
-    await page.getByRole("tab", { name: "홈", exact: true }).click();
+    const homeTab = page.getByRole("tab", { name: "홈", exact: true });
+    // Task screens use the back arrow; tabs remain on the top-level screens.
+    for (let depth = 0; depth < 8 && !(await homeTab.isVisible()); depth++) {
+      const previous = page.url();
+      await page
+        .getByRole("button", { name: "돌아가기", exact: true })
+        .first()
+        .click();
+      await page.waitForURL((url) => url.href !== previous);
+    }
+    assert.ok(await homeTab.isVisible(), "back navigation reaches a main tab");
+    await homeTab.click();
+    await page.waitForURL(base + "/");
     await page.getByTestId("refresh-home").click();
   }
   async function snapshot(page: Page, name: string) {
@@ -165,6 +177,7 @@ async function main() {
     await home(a.page);
     await a.page.getByTestId("new-round").click();
     await a.page.getByTestId("choose-" + course.course_id).click();
+    await a.page.getByTestId("setup-players").click();
     await a.page.getByTestId("add-player").click();
     await a.page.getByTestId("player-1").fill("동반자");
     await a.page.getByTestId("review-create").click();
@@ -201,7 +214,22 @@ async function main() {
       roundId,
     );
     const code = (await a.page.getByTestId("round-code").textContent())!;
-    await a.page.getByTestId("invite-code").fill(b.profile.personal_code);
+    await a.page.getByTestId("show-round-qr").click();
+    await a.page
+      .getByRole("img", { name: "방 참여용 라운드 QR", exact: true })
+      .waitFor();
+    // A round QR must not invite a personal identity.
+    await a.page.getByTestId("invite-code").fill(`yamone-golf://round/${code}`);
+    await a.page.getByTestId("send-invite").click();
+    await a.page
+      .getByText("개인 코드 또는 Yamone Golf 개인 QR을 확인해 주세요.", {
+        exact: true,
+      })
+      .waitFor();
+    assert.equal((await api(b.page, "/api/home")).invitations.length, 0);
+    await a.page.getByTestId("invite-code").fill(b.profile.personal_qr);
+    // Pasted QR data and camera results use the same identity path; sending remains explicit.
+    assert.equal((await api(b.page, "/api/home")).invitations.length, 0);
     await a.page.getByTestId("send-invite").click();
     await a.page.getByText("초대를 보냈습니다.", { exact: true }).waitFor();
     await b.page.getByTestId("refresh-home").click();
@@ -230,8 +258,19 @@ async function main() {
       roundId,
     );
     await c.page.getByTestId("join-round").click();
-    await c.page.getByTestId("join-code").fill(code);
+    await c.page.getByTestId("join-code").fill(c.profile.personal_qr);
     await c.page.getByTestId("lookup-round").click();
+    await c.page
+      .getByText(
+        "라운드 코드 또는 Yamone Golf 라운드 QR을 확인해 주세요. 개인 QR은 방 참여용이 아닙니다.",
+        { exact: true },
+      )
+      .waitFor();
+    assert.equal(await c.page.getByTestId("confirm-join").count(), 0);
+    await c.page.getByTestId("join-code").fill(`yamone-golf://round/${code}`);
+    await c.page.getByTestId("lookup-round").click();
+    await c.page.getByTestId("confirm-join").waitFor();
+    assert.equal((await api(c.page, "/api/home")).active_round, null);
     await c.page.getByTestId("confirm-join").click();
     await c.page.getByTestId("ad-unavailable").click();
     await c.page.getByTestId("round-code").waitFor();

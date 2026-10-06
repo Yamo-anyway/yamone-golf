@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
@@ -20,9 +20,9 @@ import { AdBanner } from "./ad-banner";
 import { AdPrivacy } from "./ad-privacy";
 import { BannerPlacement } from "./banner-context";
 import { showBanner, type BannerContext } from "../data/ad-policy";
-import Svg, { Path, Rect } from "react-native-svg";
-import { create } from "qrcode/lib/core/qrcode";
+import { QRCode } from "./qr-code";
 import { Button, Card, colors, Field, styles, Txt } from "./components";
+import { Icon, type IconName } from "./icons";
 import { useErrorText, useSession } from "./session";
 import { HomeRounds } from "./rounds";
 import type { Language } from "../data/model";
@@ -45,38 +45,10 @@ function emailErrorKey(code: string) {
   }
 }
 
-function PersonalQR({ value, label }: { value: string; label: string }) {
-  const matrix = useMemo(
-    () => create(value, { errorCorrectionLevel: "M" }).modules,
-    [value],
-  );
-  let d = "";
-  for (let y = 0; y < matrix.size; y++)
-    for (let x = 0; x < matrix.size; x++)
-      if (matrix.get(y, x)) d += `M${x + 4} ${y + 4}h1v1h-1z`;
-  return (
-    <View style={{ alignItems: "center" }}>
-      <Svg
-        accessibilityLabel={label}
-        accessibilityRole="image"
-        width={196}
-        height={196}
-        viewBox={`0 0 ${matrix.size + 8} ${matrix.size + 8}`}
-      >
-        <Rect width="100%" height="100%" fill="white" />
-        <Path d={d} fill={colors.ink} />
-      </Svg>
-    </View>
-  );
-}
 function Welcome() {
   const s = useSession();
   const [mode, setMode] = useState<"new" | "key" | "email">(
-      s.vault.emailRecovery
-        ? "email"
-        : s.startWithRecovery
-          ? "key"
-          : "new",
+      s.vault.emailRecovery ? "email" : s.startWithRecovery ? "key" : "new",
     ),
     [name, setName] = useState(""),
     [key, setKey] = useState(""),
@@ -85,9 +57,7 @@ function Welcome() {
     [requestId, setRequestId] = useState(
       s.vault.emailRecovery?.request_id ?? "",
     ),
-    [emailSent, setEmailSent] = useState(
-      !!s.vault.emailRecovery?.sent,
-    );
+    [emailSent, setEmailSent] = useState(!!s.vault.emailRecovery?.sent);
   return (
     <>
       <View style={{ paddingTop: 28, paddingBottom: 12, gap: 16 }}>
@@ -437,38 +407,76 @@ function BackupKey() {
   );
 }
 export function Home() {
-  const { profile, t } = useSession();
+  const { profile, t, lang } = useSession();
   if (!profile) return null;
   return (
     <>
-      <Txt style={styles.title}>
-        {profile.nickname}
-        {t("greeting")}
-      </Txt>
-      <Txt>{t("ready")}</Txt>
-      <BackupKey />
-      <HomeRounds />
-      <Card>
-        <Txt style={{ color: colors.muted }}>{t("code")}</Txt>
+      <View style={{ gap: 7, paddingTop: 2 }}>
         <Txt
-          selectable
-          testID="personal-code"
           style={{
-            fontSize: 24,
-            lineHeight: 32,
-            fontWeight: "800",
-            letterSpacing: 1,
+            color: colors.muted,
+            fontSize: 13,
+            fontWeight: "600",
+            letterSpacing: 1.4,
           }}
         >
-          {profile.personal_code}
+          {lang === "ko" ? "오늘의 라운드" : "YOUR DAY ON THE COURSE"}
         </Txt>
-        <Txt style={{ color: colors.muted }}>{t("codeHelp")}</Txt>
-        <Button
-          label={t("profile")}
-          secondary
-          onPress={() => router.push("/profile")}
-        />
-      </Card>
+        <Txt style={styles.title}>
+          {profile.nickname}
+          {lang === "ko" ? "님," : ","}
+          {"\n"}
+          {lang === "ko" ? "좋은 라운드 되세요." : "enjoy your round."}
+        </Txt>
+        <Txt style={{ color: colors.muted, fontSize: 14 }}>
+          {lang === "ko"
+            ? "동반자와 함께, 한 홀씩 기록해요."
+            : "Every hole, together with your group."}
+        </Txt>
+      </View>
+      <BackupKey />
+      <HomeRounds />
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel={`${t("code")}: ${profile.personal_code}. ${t("profile")}`}
+        onPress={() => router.push("/profile")}
+        style={({ pressed }) => ({
+          padding: 16,
+          minHeight: 78,
+          borderWidth: 1,
+          borderColor: colors.line,
+          borderRadius: 16,
+          backgroundColor: pressed ? colors.mint : colors.white,
+          flexDirection: "row",
+          alignItems: "center",
+          gap: 12,
+        })}
+      >
+        <View
+          style={{
+            width: 42,
+            height: 42,
+            borderRadius: 12,
+            backgroundColor: colors.paper,
+            alignItems: "center",
+            justifyContent: "center",
+          }}
+        >
+          <Icon name="qr" size={24} />
+        </View>
+        <View style={{ flex: 1, gap: 2 }}>
+          <Txt style={{ color: colors.muted, fontSize: 12, lineHeight: 18 }}>
+            {t("code")}
+          </Txt>
+          <Txt
+            testID="personal-code"
+            style={{ fontSize: 17, fontWeight: "700", letterSpacing: 0.6 }}
+          >
+            {profile.personal_code}
+          </Txt>
+        </View>
+        <Icon name="chevron-right" size={18} color={colors.muted} />
+      </Pressable>
     </>
   );
 }
@@ -531,19 +539,42 @@ export function ProfileScreen() {
           </>
         ) : (
           <>
-            <Txt style={{ fontSize: 23, lineHeight: 32, fontWeight: "700" }}>
-              {p.nickname}
-            </Txt>
-            <Button
-              label={s.t("change")}
-              testID="edit-profile"
-              secondary
-              onPress={() => {
-                setName(p.nickname);
-                setEditing(true);
-                setSaved(false);
-              }}
-            />
+            <View
+              style={{ flexDirection: "row", alignItems: "center", gap: 12 }}
+            >
+              <View
+                style={{
+                  height: 48,
+                  width: 48,
+                  backgroundColor: colors.mint,
+                  borderRadius: 24,
+                  alignItems: "center",
+                  justifyContent: "center",
+                }}
+              >
+                <Icon name="user" size={23} />
+              </View>
+              <Txt
+                style={{
+                  flex: 1,
+                  fontSize: 22,
+                  lineHeight: 30,
+                  fontWeight: "700",
+                }}
+              >
+                {p.nickname}
+              </Txt>
+              <Button
+                label={s.t("change")}
+                testID="edit-profile"
+                quiet
+                onPress={() => {
+                  setName(p.nickname);
+                  setEditing(true);
+                  setSaved(false);
+                }}
+              />
+            </View>
           </>
         )}
         <Txt style={{ fontSize: 14, color: colors.muted }}>
@@ -565,21 +596,37 @@ export function ProfileScreen() {
           secondary
           onPress={() => setQR(!qr)}
         />
-        {qr && <PersonalQR value={p.personal_qr} label={s.t("qrLabel")} />}
+        {qr && <QRCode value={p.personal_qr} label={s.t("qrLabel")} />}
       </Card>
       <Card>
         <Txt style={{ fontWeight: "700" }}>{s.t("language")}</Txt>
         {(["system", "ko", "en"] as Language[]).map((l) => (
-          <Button
+          <Pressable
             key={l}
-            label={
-              (p.language === l ? "✓ " : "") +
-              s.t(l === "system" ? "system" : l === "ko" ? "korean" : "english")
-            }
-            secondary={p.language !== l}
+            accessibilityRole="radio"
+            accessibilityState={{ checked: p.language === l, disabled: s.busy }}
             disabled={s.busy}
             onPress={() => void s.update({ language: l })}
-          />
+            style={({ pressed }) => ({
+              minHeight: 52,
+              paddingHorizontal: 14,
+              borderRadius: 10,
+              flexDirection: "row",
+              alignItems: "center",
+              justifyContent: "space-between",
+              gap: 12,
+              backgroundColor:
+                p.language === l || pressed ? colors.mint : colors.white,
+              opacity: s.busy ? 0.55 : 1,
+            })}
+          >
+            <Txt style={{ fontWeight: p.language === l ? "700" : "400" }}>
+              {s.t(
+                l === "system" ? "system" : l === "ko" ? "korean" : "english",
+              )}
+            </Txt>
+            {p.language === l && <Icon name="check" size={19} />}
+          </Pressable>
         ))}
         <Txt style={{ color: colors.muted, fontSize: 14 }}>
           {s.t("languageHint")}
@@ -677,7 +724,9 @@ export function EmailRecoveryLinkScreen() {
         <Txt>{s.t("invalidEmailLink")}</Txt>
       ) : done ? (
         <>
-          <Txt>{s.t(kind === "verify" ? "emailVerified" : "emailRecovered")}</Txt>
+          <Txt>
+            {s.t(kind === "verify" ? "emailVerified" : "emailRecovered")}
+          </Txt>
           <Button
             label={s.t("continueHome")}
             onPress={() => router.dismissTo("/")}
@@ -733,15 +782,24 @@ export function EmailRecoveryLinkScreen() {
 export function Shell({
   children,
   publicScreen = false,
+  scroll = true,
 }: {
   children: React.ReactNode;
   publicScreen?: boolean;
+  scroll?: boolean;
 }) {
   const [detailBanner, setDetailBanner] = useState<BannerContext | null>(null);
   const focused = useIsFocused();
   const s = useSession(),
     error = useErrorText(),
     path = usePathname();
+  const { select } = useLocalSearchParams<{ select?: string }>();
+  const topLevel =
+    ["/", "/courses", "/records", "/profile", "/statistics"].includes(path) &&
+    !(path === "/courses" && select === "1");
+  const hasTabs = s.phase === "ready" && topLevel;
+  const hasBrand = topLevel || s.phase !== "ready";
+  const canScroll = scroll || (!publicScreen && s.phase !== "ready");
   const context: BannerContext =
     detailBanner ??
     (path === "/"
@@ -752,6 +810,55 @@ export function Shell({
           ? { screen: "statistics", flow: "record" }
           : { screen: "other", flow: "round" });
   const bannerAllowed = focused && s.phase === "ready" && showBanner(context);
+  const messages = (
+    <>
+      {error && (
+        <View
+          accessibilityRole="alert"
+          style={{
+            backgroundColor: "#FCEDE9",
+            padding: 14,
+            borderRadius: 12,
+            margin: canScroll ? 0 : 14,
+          }}
+        >
+          <Txt style={{ color: colors.error }}>{error}</Txt>
+        </View>
+      )}
+      {s.offline && (
+        <Txt
+          testID="offline-session"
+          style={{
+            fontSize: 13,
+            color: colors.muted,
+            paddingHorizontal: canScroll ? 0 : 16,
+            paddingVertical: canScroll ? 0 : 6,
+          }}
+        >
+          {s.t("offlineSession")}
+        </Txt>
+      )}
+    </>
+  );
+  const content = publicScreen ? children : <Gate>{children}</Gate>;
+  const tabs: {
+    route: "/" | "/courses" | "/records" | "/profile";
+    icon: IconName;
+    label: string;
+  }[] = [
+    { route: "/", icon: "home", label: s.t("home") },
+    { route: "/courses", icon: "flag", label: s.t("courses") },
+    {
+      route: "/records",
+      icon: "scorecard",
+      label: s.lang === "ko" ? "기록" : "Records",
+    },
+    {
+      route: "/profile",
+      icon: "user",
+      label: s.lang === "ko" ? "내 정보" : "Profile",
+    },
+  ];
   return (
     <BannerPlacement.Provider value={setDetailBanner}>
       <SafeAreaView style={{ flex: 1, backgroundColor: colors.paper }}>
@@ -759,85 +866,212 @@ export function Shell({
           style={{ flex: 1 }}
           behavior={Platform.OS === "ios" ? "padding" : undefined}
         >
-          <View
-            style={{
-              paddingHorizontal: 22,
-              paddingVertical: 18,
-              borderBottomWidth: 1,
-              borderColor: colors.line,
-            }}
-          >
-            <Txt style={{ fontSize: 15, letterSpacing: 2, fontWeight: "800" }}>
-              {s.t("brand")}
-            </Txt>
-          </View>
-          <ScrollView
-            testID="screen-scroll"
-            keyboardShouldPersistTaps="handled"
-            contentContainerStyle={{
-              padding: 22,
-              paddingBottom: 32,
-              gap: 20,
-              maxWidth: 520,
-              width: "100%",
-              alignSelf: "center",
-              flexGrow: 1,
-            }}
-          >
-            {error && (
+          {hasBrand && (
+            <View
+              style={{
+                width: "100%",
+                maxWidth: 560,
+                alignSelf: "center",
+                minHeight: 70,
+                paddingHorizontal: 20,
+                paddingVertical: 12,
+                flexDirection: "row",
+                alignItems: "center",
+                justifyContent: "space-between",
+                gap: 16,
+              }}
+            >
               <View
-                accessibilityRole="alert"
-                style={{
-                  backgroundColor: "#FCECE7",
-                  padding: 14,
-                  borderRadius: 12,
-                }}
+                accessibilityLabel={s.t("brand")}
+                style={{ flexDirection: "row", alignItems: "center", gap: 9 }}
               >
-                <Txt style={{ color: colors.error }}>{error}</Txt>
+                <View
+                  style={{
+                    width: 33,
+                    height: 36,
+                    borderRadius: 10,
+                    backgroundColor: colors.green,
+                    alignItems: "center",
+                    justifyContent: "center",
+                  }}
+                >
+                  <Icon name="flag" color={colors.lime} size={20} />
+                </View>
+                <View>
+                  <Txt
+                    style={{
+                      fontSize: 12,
+                      lineHeight: 15,
+                      letterSpacing: 2.1,
+                      fontWeight: "800",
+                    }}
+                  >
+                    YAMONE
+                  </Txt>
+                  <Txt
+                    style={{
+                      fontSize: 11,
+                      lineHeight: 14,
+                      letterSpacing: 3.7,
+                      fontWeight: "500",
+                      color: colors.muted,
+                    }}
+                  >
+                    GOLF
+                  </Txt>
+                </View>
               </View>
-            )}
-            {s.offline && (
-              <Txt
-                testID="offline-session"
-                style={{ fontSize: 13, color: colors.muted }}
-              >
-                {s.t("offlineSession")}
-              </Txt>
-            )}
-            {publicScreen ? children : <Gate>{children}</Gate>}
-          </ScrollView>
+              {s.profile && s.phase === "ready" && (
+                <Pressable
+                  accessibilityRole="button"
+                  accessibilityLabel={s.t("profile")}
+                  onPress={() => {
+                    if (path !== "/profile") router.push("/profile");
+                  }}
+                  style={({ pressed }) => ({
+                    minHeight: 48,
+                    minWidth: 48,
+                    paddingHorizontal: 10,
+                    flexDirection: "row",
+                    alignItems: "center",
+                    gap: 7,
+                    borderRadius: 24,
+                    backgroundColor: pressed ? colors.mint : "transparent",
+                    maxWidth: "50%",
+                  })}
+                >
+                  <Txt
+                    numberOfLines={1}
+                    style={{ fontSize: 13, fontWeight: "600", flexShrink: 1 }}
+                  >
+                    {s.profile.nickname}
+                  </Txt>
+                  <View
+                    style={{
+                      width: 31,
+                      height: 31,
+                      borderRadius: 16,
+                      backgroundColor: colors.mint,
+                      alignItems: "center",
+                      justifyContent: "center",
+                    }}
+                  >
+                    <Icon name="user" size={17} />
+                  </View>
+                </Pressable>
+              )}
+            </View>
+          )}
+          {canScroll ? (
+            <ScrollView
+              testID="screen-scroll"
+              keyboardShouldPersistTaps="handled"
+              keyboardDismissMode="on-drag"
+              contentContainerStyle={{
+                paddingHorizontal: 20,
+                paddingTop: hasBrand ? 12 : 18,
+                paddingBottom: 28,
+                gap: 20,
+                maxWidth: 560,
+                width: "100%",
+                alignSelf: "center",
+                flexGrow: 1,
+              }}
+            >
+              {messages}
+              {content}
+            </ScrollView>
+          ) : (
+            <View
+              testID="screen-fixed"
+              style={{
+                flex: 1,
+                width: "100%",
+                maxWidth: 560,
+                alignSelf: "center",
+              }}
+            >
+              {messages}
+              {content}
+            </View>
+          )}
           {bannerAllowed && <AdBanner />}
-          {s.phase === "ready" && (
+          {hasTabs && (
             <View
               testID="bottom-navigation"
               style={{
                 borderTopWidth: 1,
                 borderColor: colors.line,
-                backgroundColor: "#FFFFFF",
-                flexDirection: "row",
+                backgroundColor: colors.white,
               }}
             >
-              {(["/", "/profile"] as const).map((route) => (
-                <Pressable
-                  key={route}
-                  accessibilityRole="tab"
-                  accessibilityState={{ selected: path === route }}
-                  onPress={() => {
-                    if (path !== route) router.dismissTo(route);
-                  }}
-                  style={{
-                    flex: 1,
-                    padding: 18,
-                    minHeight: 58,
-                    alignItems: "center",
-                    backgroundColor: path === route ? colors.mint : "#FFFFFF",
-                  }}
-                >
-                  <Txt style={{ fontWeight: path === route ? "800" : "500" }}>
-                    {s.t(route === "/" ? "home" : "profile")}
-                  </Txt>
-                </Pressable>
-              ))}
+              <View
+                style={{
+                  flexDirection: "row",
+                  maxWidth: 560,
+                  width: "100%",
+                  alignSelf: "center",
+                  paddingHorizontal: 8,
+                  paddingTop: 7,
+                  paddingBottom: 4,
+                }}
+              >
+                {tabs.map(({ route, icon, label }) => {
+                  const selected =
+                    path === route ||
+                    (route === "/records" && path === "/statistics");
+                  return (
+                    <Pressable
+                      key={route}
+                      accessibilityRole="tab"
+                      accessibilityLabel={label}
+                      accessibilityState={{ selected }}
+                      onPress={() => {
+                        if (path !== route) router.dismissTo(route);
+                      }}
+                      style={({ pressed }) => ({
+                        flex: 1,
+                        minHeight: 56,
+                        alignItems: "center",
+                        justifyContent: "center",
+                        gap: 3,
+                        borderRadius: 12,
+                        backgroundColor: pressed ? colors.paper : "transparent",
+                      })}
+                    >
+                      <View
+                        style={{
+                          minWidth: 47,
+                          height: 29,
+                          borderRadius: 15,
+                          alignItems: "center",
+                          justifyContent: "center",
+                          backgroundColor: selected
+                            ? colors.mint
+                            : "transparent",
+                        }}
+                      >
+                        <Icon
+                          name={icon}
+                          size={21}
+                          color={selected ? colors.green : colors.muted}
+                          strokeWidth={selected ? 2.1 : 1.7}
+                        />
+                      </View>
+                      <Txt
+                        style={{
+                          fontSize: 11,
+                          lineHeight: 16,
+                          color: selected ? colors.green : colors.muted,
+                          fontWeight: selected ? "700" : "500",
+                        }}
+                      >
+                        {label}
+                      </Txt>
+                    </Pressable>
+                  );
+                })}
+              </View>
             </View>
           )}
         </KeyboardAvoidingView>

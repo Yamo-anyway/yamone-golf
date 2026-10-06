@@ -194,7 +194,9 @@ async function main() {
       .getByTestId("queued-holes")
       .filter({ hasText: "2, 3" })
       .waitFor();
-    await a.page.getByRole("tab", { name: "홈", exact: true }).click();
+    // This directly opened task screen returns home through its back arrow.
+    await a.page.getByRole("button", { name: "돌아가기", exact: true }).click();
+    await a.page.waitForURL(base + "/");
     await a.page.reload();
     await a.page.getByTestId("resume-local-" + round.round_id).click();
     await a.page
