@@ -33,6 +33,7 @@ async function main() {
           "tests/players-ui.ts",
           "tests/scores-ui.ts",
           "tests/scorecard-flow-ui.ts",
+          "tests/assets-ui.ts",
           "tests/offline-ui.ts",
           "tests/ending-ui.ts",
           "tests/records-ui.ts",

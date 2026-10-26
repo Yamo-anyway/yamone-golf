@@ -659,7 +659,11 @@ export function NewRoundScreen() {
       >
         <Problem text={task.errorText || query.errorText} />
         {!current ? (
-          <Button label={t("retry")} onPress={() => void query.reload()} />
+          <Button
+            label={t("retry")}
+            iconName="refresh"
+            onPress={() => void query.reload()}
+          />
         ) : (
           <>
             <Card>
@@ -1047,7 +1051,11 @@ export function RoundActionScreen() {
       )}
       <Problem text={task.errorText || query.errorText} />
       {!data ? (
-        <Button label={t("retry")} onPress={() => void query.reload()} />
+        <Button
+          label={t("retry")}
+          iconName="refresh"
+          onPress={() => void query.reload()}
+        />
       ) : (
         <>
           <Card>

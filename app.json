@@ -18,7 +18,8 @@
     "android": {
       "adaptiveIcon": {
         "foregroundImage": "./assets/android-icon-foreground.png",
-        "backgroundColor": "#173F34"
+        "backgroundColor": "#174E3F",
+        "monochromeImage": "./assets/android-icon-monochrome.png"
       },
       "predictiveBackGestureEnabled": false,
       "package": "com.yamone.golf.dev",
@@ -39,6 +40,15 @@
       "expo-localization",
       "expo-secure-store",
       "expo-router",
+      [
+        "expo-splash-screen",
+        {
+          "image": "./assets/splash-icon.png",
+          "imageWidth": 140,
+          "resizeMode": "contain",
+          "backgroundColor": "#F5F6F2"
+        }
+      ],
       [
         "expo-camera",
         {

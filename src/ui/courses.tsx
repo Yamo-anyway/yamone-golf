@@ -1,3 +1,4 @@
+import { EmptyState } from "./state-artwork";
 import { RoundSteps } from "./round-flow";
 import { DragRow } from "./drag-row";
 import { Icon } from "./icons";
@@ -7,13 +8,32 @@ import { router, useLocalSearchParams } from "expo-router";
 import * as Crypto from "expo-crypto";
 import { golf, type Course } from "../data/golf";
 import { useSession } from "./session";
-import { Button, Card, colors, Field, styles, Txt } from "./components";
+import {
+  Button,
+  Card,
+  colors,
+  Field,
+  IconButton,
+  styles,
+  Txt,
+} from "./components";
 import { confirm, useDraftGuard, useLoad, useTask } from "./golf-hooks";
 export function Problem({ text }: { text: string }) {
   return text ? (
-    <Txt accessibilityRole="alert" style={{ color: colors.error }}>
-      {text}
-    </Txt>
+    <View
+      accessibilityRole="alert"
+      style={{
+        flexDirection: "row",
+        gap: 8,
+        padding: 12,
+        borderRadius: 12,
+        backgroundColor: colors.errorSoft,
+        alignItems: "flex-start",
+      }}
+    >
+      <Icon name="warning" color={colors.error} size={20} />
+      <Txt style={{ color: colors.error, flex: 1 }}>{text}</Txt>
+    </View>
   ) : null;
 }
 export function Heading({
@@ -33,9 +53,11 @@ export function Heading({
         minHeight: 52,
       }}
     >
-      <Pressable
-        accessibilityRole="button"
-        accessibilityLabel={t("back")}
+      <IconButton
+        label={t("back")}
+        iconName="chevron-left"
+        secondary
+        size="compact"
         onPress={() =>
           onBack
             ? onBack()
@@ -43,19 +65,7 @@ export function Heading({
               ? router.back()
               : router.dismissTo("/")
         }
-        style={({ pressed }) => ({
-          width: 48,
-          height: 48,
-          borderRadius: 16,
-          alignItems: "center",
-          justifyContent: "center",
-          backgroundColor: pressed ? colors.mint : "#FFFFFF",
-          borderWidth: 1,
-          borderColor: colors.line,
-        })}
-      >
-        <Icon name="chevron-left" size={22} color={colors.ink} />
-      </Pressable>
+      />
       <Txt
         accessibilityRole="header"
         style={{
@@ -296,6 +306,7 @@ export function CoursesScreen() {
         <>
           <Field
             label={t("searchHint")}
+            leadingIcon="search"
             placeholder={t("courseName")}
             returnKeyType="search"
             value={query}
@@ -305,6 +316,7 @@ export function CoursesScreen() {
           />
           <Button
             label={t("search")}
+            iconName="search"
             busy={task.busy}
             onPress={() => void search()}
           />
@@ -314,6 +326,7 @@ export function CoursesScreen() {
           <Txt style={{ color: colors.muted }}>{t("sortHint")}</Txt>
           <Button
             label={t("refresh")}
+            iconName="refresh"
             quiet
             onPress={() => void mine.reload()}
           />
@@ -329,7 +342,10 @@ export function CoursesScreen() {
       {!visible ? (
         <Txt>{t("loading")}</Txt>
       ) : visible.length === 0 ? (
-        <Txt>{t("noCourses")}</Txt>
+        <EmptyState
+          kind={publicMode ? "search" : "courses"}
+          title={t("noCourses")}
+        />
       ) : (
         visible.map((c, i) =>
           publicMode ? (
@@ -402,7 +418,11 @@ export function CourseEditor() {
       <CourseSource course={current} />
       <Problem text={task.errorText || loaded.errorText} />
       {id && !loaded.data ? (
-        <Button label={t("retry")} onPress={() => void loaded.reload()} />
+        <Button
+          label={t("retry")}
+          iconName="refresh"
+          onPress={() => void loaded.reload()}
+        />
       ) : (
         <>
           <Field
@@ -566,6 +586,7 @@ export function CourseEditor() {
           ) : (
             <Button
               label={t("save")}
+              iconName="save"
               testID="save-course"
               busy={task.busy}
               disabled={!canSave}

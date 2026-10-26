@@ -1,3 +1,5 @@
+import { Icon } from "./icons";
+import { ScoreMark } from "./score-mark";
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
   Modal,
@@ -9,13 +11,8 @@ import {
 } from "react-native";
 import { router, useLocalSearchParams, useFocusEffect } from "expo-router";
 import { useNavigation, usePreventRemove } from "expo-router/react-navigation";
-import {
-  scoreAt,
-  ranking,
-  symbolFor,
-  type ScoreSheet,
-} from "../../shared/scores";
-import { Button, Card, Txt, colors } from "./components";
+import { scoreAt, ranking, type ScoreSheet } from "../../shared/scores";
+import { Button, Card, StatusBadge, Txt, colors } from "./components";
 import { Heading, Problem } from "./courses";
 import { useTask } from "./golf-hooks";
 import { useSession } from "./session";
@@ -206,7 +203,11 @@ export function ScoresScreen() {
       <>
         <Heading title={t("scoreEntry")} />
         <Problem text={storeError} />
-        <Button label={t("retry")} onPress={() => void reload()} />
+        <Button
+          label={t("retry")}
+          iconName="refresh"
+          onPress={() => void reload()}
+        />
       </>
     );
   const { sheet, rows } = draft,
@@ -502,15 +503,11 @@ export function ScoresScreen() {
                         { opacity: disabled ? 0.35 : pressed ? 0.65 : 1 },
                       ]}
                     >
-                      <Txt
-                        style={{
-                          fontSize: 25,
-                          lineHeight: 30,
-                          color: delta > 0 ? "#fff" : colors.ink,
-                        }}
-                      >
-                        {delta < 0 ? "−" : "+"}
-                      </Txt>
+                      <Icon
+                        name={delta < 0 ? "minus" : "plus"}
+                        size={24}
+                        color={delta > 0 ? colors.white : colors.ink}
+                      />
                     </Pressable>
                   );
                 })}
@@ -661,6 +658,7 @@ export function ScoresScreen() {
         />
         <Button
           label={t("refresh")}
+          iconName="refresh"
           secondary
           testID="refresh-scores"
           disabled={task.busy}
@@ -822,49 +820,6 @@ export function ScoresScreen() {
     </View>
   );
 }
-function ScoreMark({ strokes, par }: { strokes: number | null; par: number }) {
-  const symbol = symbolFor(strokes, par),
-    color =
-      symbol === "birdie"
-        ? "#AE483C"
-        : symbol === "bogey" || symbol === "double"
-          ? "#3B637D"
-          : colors.ink;
-  return (
-    <View
-      style={{
-        width: 21,
-        height: 25,
-        alignItems: "center",
-        justifyContent: "center",
-        borderWidth:
-          symbol === "birdie" || symbol === "bogey" || symbol === "double"
-            ? 1
-            : 0,
-        borderColor: color,
-        borderRadius: symbol === "birdie" ? 14 : 0,
-      }}
-    >
-      {symbol === "double" && (
-        <View
-          pointerEvents="none"
-          style={{
-            position: "absolute",
-            top: 2,
-            bottom: 2,
-            left: 2,
-            right: 2,
-            borderWidth: 1,
-            borderColor: color,
-          }}
-        />
-      )}
-      <Txt style={{ fontSize: 11, lineHeight: 17, color }}>
-        {strokes ?? "—"}
-      </Txt>
-    </View>
-  );
-}
 export function ScorecardScreen() {
   const { id } = useLocalSearchParams<{ id: string }>(),
     { t, profile } = useSession(),
@@ -909,14 +864,12 @@ export function ScorecardScreen() {
             {t("cachedScorecardHelp")}
           </Txt>
           {Object.keys(local?.queue ?? {}).length > 0 && (
-            <Txt
-              testID="scorecard-pending"
-              accessibilityLiveRegion="polite"
-              style={{ color: "#806225", fontSize: 13 }}
-            >
-              {t("pendingHoles")} {Object.keys(local?.queue ?? {}).length} ·{" "}
-              {t("scoreQueued")}
-            </Txt>
+            <View testID="scorecard-pending" accessibilityLiveRegion="polite">
+              <StatusBadge
+                tone="queued"
+                label={`${t("pendingHoles")} ${Object.keys(local?.queue ?? {}).length} · ${t("scoreQueued")}`}
+              />
+            </View>
           )}
           <ScorecardContent
             sheet={sheet}
@@ -945,6 +898,7 @@ export function ScorecardScreen() {
                 />
                 <Button
                   label={t("refresh")}
+                  iconName="refresh"
                   testID="refresh-scorecard"
                   secondary
                   onPress={() => void reload()}
@@ -957,6 +911,7 @@ export function ScorecardScreen() {
       {!sheet && (
         <Button
           label={t("refresh")}
+          iconName="refresh"
           testID="refresh-scorecard"
           secondary
           onPress={() => void reload()}

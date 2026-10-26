@@ -1,3 +1,4 @@
+import { BrandLockup, BrandMark } from "./brand";
 import React, { useEffect, useState } from "react";
 import {
   ActivityIndicator,
@@ -94,6 +95,7 @@ function Welcome() {
           />
           <Button
             label={s.t("recover")}
+            iconName="lock"
             testID="recover"
             disabled={!key.trim()}
             busy={s.busy}
@@ -116,6 +118,7 @@ function Welcome() {
               />
               <Button
                 label={s.t("sendRecoveryCode")}
+                iconName="mail"
                 testID="send-email-recovery"
                 disabled={!email.trim()}
                 busy={s.busy}
@@ -144,6 +147,7 @@ function Welcome() {
               />
               <Button
                 label={s.t("recover")}
+                iconName="lock"
                 testID="recover-by-email"
                 disabled={!requestId || !code.trim()}
                 busy={s.busy}
@@ -342,6 +346,7 @@ function RecoveryEmailCard() {
           />
           <Button
             label={s.t("sendVerificationCode")}
+            iconName="mail"
             testID="send-email-verification"
             disabled={!email.trim()}
             busy={busy}
@@ -520,6 +525,7 @@ export function ProfileScreen() {
             />
             <Button
               label={s.t("save")}
+              iconName="save"
               testID="save-nickname"
               disabled={!name.trim()}
               busy={s.busy}
@@ -644,8 +650,11 @@ function Gate({ children }: { children: React.ReactNode }) {
   if (s.phase === "loading")
     return (
       <>
-        <ActivityIndicator color={colors.green} />
-        <Txt>{s.t("loading")}</Txt>
+        <View style={{ alignItems: "center", paddingVertical: 48, gap: 20 }}>
+          <BrandLockup size={64} />
+          <ActivityIndicator color={colors.green} />
+          <Txt>{s.t("loading")}</Txt>
+        </View>
       </>
     );
   if (s.phase === "pending")
@@ -696,6 +705,7 @@ function Gate({ children }: { children: React.ReactNode }) {
       <Txt style={styles.title}>{s.t("retry")}</Txt>
       <Button
         label={s.t("retry")}
+        iconName="refresh"
         busy={s.busy}
         onPress={() => void s.refresh()}
       />
@@ -885,18 +895,7 @@ export function Shell({
                 accessibilityLabel={s.t("brand")}
                 style={{ flexDirection: "row", alignItems: "center", gap: 9 }}
               >
-                <View
-                  style={{
-                    width: 33,
-                    height: 36,
-                    borderRadius: 10,
-                    backgroundColor: colors.green,
-                    alignItems: "center",
-                    justifyContent: "center",
-                  }}
-                >
-                  <Icon name="flag" color={colors.lime} size={20} />
-                </View>
+                <BrandMark size={36} />
                 <View>
                   <Txt
                     style={{

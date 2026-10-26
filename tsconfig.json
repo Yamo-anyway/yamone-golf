@@ -2,22 +2,15 @@
   "extends": "expo/tsconfig.base",
   "compilerOptions": {
     "strict": true,
-    "types": [
-      "react-native",
-      "node"
-    ]
+    "types": ["react-native", "node"]
   },
   "include": [
     "app.config.ts",
     "src/**/*.ts",
     "src/**/*.tsx",
     "tests/**/*.ts",
-    "scripts/**/*.ts"
+    "scripts/**/*.ts",
+    "design/**/*.tsx"
   ],
-  "exclude": [
-    "node_modules",
-    "yamone-golf-cloudflare",
-    "dist",
-    "dist-android"
-  ]
+  "exclude": ["node_modules", "yamone-golf-cloudflare", "dist", "dist-android"]
 }
