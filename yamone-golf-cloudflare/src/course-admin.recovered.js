@@ -1,7 +1,8 @@
-// Recovered without behavioral changes from admin 0.3.22; see docs/SOURCE_INTEGRATION_20261026.md.
+// Recovered baseline from admin 0.3.22; later fixes are recorded in docs/STEP4_COURSE_DATA_20261026.md; see docs/SOURCE_INTEGRATION_20261026.md.
+import { courseQualityAudit } from "./course-quality";
 import { ApiError, hash, now, json, body, authenticate, limit } from "./shared";
 import { ADMIN_COUNTRIES, isAdminCountryCode } from "../../shared/countries";
-import { validateLocalization, REGION_GROUPS_BY_COUNTRY, presentCourse, regionGroupSQL, localizationFor, viewerRegion } from "./course-presentation.js";
+import { courseSearchSQL, validateLocalization, REGION_GROUPS_BY_COUNTRY, presentCourse, regionGroupSQL, localizationFor, viewerRegion } from "./course-presentation.js";
 import { golfCoreSourceUrl, fetchGolfCoreDetail, fetchGolfCorePage, golfCoreSyncStatus, syncNextGolfCoreCatalogPage } from "./golfcore-sync.recovered.js";
 import { adminPage } from "./course-admin-page.recovered.js";
 const __name = (target, value) => Object.defineProperty(target, "name", { value, configurable: true });
@@ -248,14 +249,12 @@ function object3(value) {
 }
 __name(object3, "object");
 function scorecard(value) {
-  if (!Array.isArray(value)) return null;
-  const holes = value.map(object3).filter((hole) => !!hole).map((hole) => ({ position: Number(hole.position), par: Number(hole.par) })).filter(
-    (hole) => Number.isInteger(hole.position) && Number.isInteger(hole.par) && hole.par >= 3 && hole.par <= 7
-  ).sort((a, b) => a.position - b.position);
-  const length = holes.length;
-  if (length !== 9 && length !== 18) return null;
-  if (holes.some((hole, index) => hole.position !== index + 1)) return null;
-  return holes.map((hole) => hole.par);
+  if (!Array.isArray(value) || ![9,18].includes(value.length)) return null;
+  const holes = value.map(object3);
+  if (holes.some(hole => !hole || !Number.isInteger(Number(hole.position)) || !Number.isInteger(Number(hole.par)) || Number(hole.par)<3 || Number(hole.par)>7)) return null;
+  const sorted = holes.map(hole=>({position:Number(hole.position),par:Number(hole.par)})).sort((a,b)=>a.position-b.position);
+  if (sorted.some((hole,index)=>hole.position!==index+1)) return null;
+  return sorted.map(hole=>hole.par);
 }
 __name(scorecard, "scorecard");
 function trimSegmentName(value) {
@@ -536,14 +535,14 @@ async function listDeletedAdminCourses(env, url, viewer) {
     env.DB.prepare(
       `SELECT c.*,d.previous_active,d.deleted_at FROM course_deleted_items d
        JOIN courses c ON c.course_id=d.course_id
-       WHERE instr(lower(c.name||' '||c.address||' '||c.localized_json),lower(?))>0
+       WHERE instr(${courseSearchSQL("c.")},lower(?))>0
          AND (?='' OR c.country_code=?)
        ORDER BY d.deleted_at DESC,c.course_id LIMIT 11 OFFSET ?`
     ).bind(q, country, country, offset).all(),
     env.DB.prepare(
       `SELECT COUNT(*) AS count FROM course_deleted_items d
        JOIN courses c ON c.course_id=d.course_id
-       WHERE instr(lower(c.name||' '||c.address||' '||c.localized_json),lower(?))>0
+       WHERE instr(${courseSearchSQL("c.")},lower(?))>0
          AND (?='' OR c.country_code=?)`
     ).bind(q, country, country).first()
   ]);
@@ -1006,6 +1005,7 @@ async function courseAdminRoute(request, env) {
   if (!path.startsWith("/admin/api")) return null;
   await authenticateAdmin(request, env);
   await limit(request, env, "course-admin", 240, 6e4);
+  if (path === "/admin/api/courses/audit" && request.method === "GET") return courseQualityAudit(env, url);
   if (path === "/admin/api/session" && request.method === "GET")
     return json({ ok: true });
   if (path === "/admin/api/overview" && request.method === "GET")
@@ -1057,7 +1057,7 @@ async function courseAdminRoute(request, env) {
     const [rows, total] = await Promise.all([
       env.DB.prepare(
       `SELECT c.* FROM courses c
-       WHERE instr(lower(c.name||' '||c.address||' '||c.localized_json),lower(?))>0
+       WHERE instr(${courseSearchSQL("c.")},lower(?))>0
        AND (?='' OR c.country_code=?)
        AND (?='all' OR c.active=CASE WHEN ?='active' THEN 1 ELSE 0 END)
        AND NOT EXISTS(SELECT 1 FROM course_deleted_items d WHERE d.course_id=c.course_id)
@@ -1068,7 +1068,7 @@ async function courseAdminRoute(request, env) {
       ).bind(q, country, country, status2, status2, offset).all(),
       env.DB.prepare(
         `SELECT COUNT(*) AS count FROM courses
-         WHERE instr(lower(name||' '||address||' '||localized_json),lower(?))>0
+         WHERE instr(${courseSearchSQL()},lower(?))>0
            AND (?='' OR country_code=?)
            AND (?='all' OR active=CASE WHEN ?='active' THEN 1 ELSE 0 END)
            AND NOT EXISTS(SELECT 1 FROM course_deleted_items d WHERE d.course_id=courses.course_id)`

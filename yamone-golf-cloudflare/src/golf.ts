@@ -31,6 +31,7 @@ import {
 
 import { isWorldCountryCode } from "../../shared/countries";
 import {
+  courseSearchSQL,
   presentCourse,
   regionGroupSQL,
   viewerRegion,
@@ -143,6 +144,23 @@ async function getCourse(env: Env, id: string) {
   if (!c) throw new ApiError("course_not_found", 404);
   return c;
 }
+const enabledCountryCheck = (country: string): Check => ({
+  sql: "SELECT 1 WHERE ?='' OR COALESCE((SELECT enabled FROM country_course_settings WHERE country_code=?),1)=1",
+  args: [country, country],
+});
+async function assertCountryEnabled(env: Env, country: string) {
+  if (
+    country &&
+    (
+      await stmt(
+        env,
+        "SELECT enabled FROM country_course_settings WHERE country_code=?",
+        country,
+      ).first<{ enabled: number }>()
+    )?.enabled === 0
+  )
+    throw new ApiError("country_unavailable", 403);
+}
 async function activeRound(env: Env, user: string) {
   const current = await stmt(
     env,
@@ -196,6 +214,11 @@ async function precheck(env: Env, d: Device, a: Action) {
   const p = JSON.parse(a.payload_json);
   if (active && !(a.kind === "join" && active.round_id === p.round_id))
     throw new ApiError("active_round_exists", 409);
+  if (a.kind === "create") {
+    const current = await getCourse(env, p.course.course_id);
+    if (current.version !== p.course.version)
+      throw new ApiError("course_changed", 409);
+  }
   if (a.kind === "join") {
     if ((await getRound(env, p.round_id)).status !== "active")
       throw new ApiError("round_ended", 409);
@@ -264,7 +287,10 @@ async function execute(env: Env, d: Device, a: Action) {
   ];
   const writes: D1PreparedStatement[] = [];
   if (a.kind === "create") {
-    checks.push(freeCheck(d));
+    checks.push(freeCheck(d), {
+      sql: "SELECT 1 FROM courses WHERE course_id=? AND version=? AND active=1 AND (country_code='' OR COALESCE((SELECT enabled FROM country_course_settings s WHERE s.country_code=courses.country_code),1)=1)",
+      args: [p.course.course_id, p.course.version],
+    });
     writes.push(
       stmt(
         env,
@@ -386,13 +412,18 @@ export async function golfRoute(request: Request, env: Env): Promise<Response> {
   const lifecycle = await lifecycleRoute(request, env, d);
   if (lifecycle) return lifecycle;
   if (path === "/api/courses" && method === "GET") {
+    const country = (url.searchParams.get("country") ?? "").toUpperCase();
+    if (country && !isWorldCountryCode(country))
+      throw new ApiError("invalid_country");
     const q = (url.searchParams.get("q") ?? "").slice(0, 80),
       offset = Math.max(0, Number(url.searchParams.get("offset") ?? 0));
     if (!Number.isSafeInteger(offset) || offset > 100000)
       throw new ApiError("invalid_request");
     const rows = await stmt(
       env,
-      "SELECT * FROM courses WHERE active=1 AND (country_code='' OR COALESCE((SELECT enabled FROM country_course_settings s WHERE s.country_code=courses.country_code),1)=1) AND instr(lower(name||' '||region||' '||city||' '||address||' '||localized_json),lower(?))>0 ORDER BY name,course_id LIMIT 31 OFFSET ?",
+      `SELECT * FROM courses WHERE active=1 AND (country_code='' OR COALESCE((SELECT enabled FROM country_course_settings s WHERE s.country_code=courses.country_code),1)=1) AND (?='' OR country_code=?) AND instr(${courseSearchSQL()},lower(?))>0 ORDER BY name,course_id LIMIT 31 OFFSET ?`,
+      country,
+      country,
       q,
       offset,
     ).all<Course>();
@@ -407,6 +438,7 @@ export async function golfRoute(request: Request, env: Env): Promise<Response> {
     const b = await body(request),
       id = uid(b.course_id),
       v = courseInput(b);
+    await assertCountryEnabled(env, v.country_code);
     const old = await stmt(
       env,
       "SELECT * FROM courses WHERE course_id=?",
@@ -426,7 +458,7 @@ export async function golfRoute(request: Request, env: Env): Promise<Response> {
     await atomic(
       env,
       d,
-      [],
+      [enabledCountryCheck(v.country_code)],
       [
         stmt(
           env,
@@ -457,6 +489,7 @@ export async function golfRoute(request: Request, env: Env): Promise<Response> {
       const b = await body(request),
         v = courseInput(b),
         version = revision(b.version);
+      await assertCountryEnabled(env, v.country_code);
       await atomic(
         env,
         d,
@@ -465,6 +498,7 @@ export async function golfRoute(request: Request, env: Env): Promise<Response> {
             sql: "SELECT 1 FROM courses WHERE course_id=? AND version=?",
             args: [id, version],
           },
+          enabledCountryCheck(v.country_code),
         ],
         [
           stmt(

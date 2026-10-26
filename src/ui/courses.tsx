@@ -1,3 +1,6 @@
+import { deviceCountry } from "../data/device-country";
+import { CountryPicker } from "./country-picker";
+import { countryName, courseName } from "../data/course-presentation";
 import { EmptyState } from "./state-artwork";
 import { RoundSteps } from "./round-flow";
 import { DragRow } from "./drag-row";
@@ -101,20 +104,24 @@ function CourseSource({ course }: { course: Course }) {
   );
 }
 export function CoursesScreen() {
-  const { t } = useSession();
+  const { t, lang } = useSession();
   const { select } = useLocalSearchParams<{ select?: string }>();
   const mine = useLoad(golf.mine),
     task = useTask();
   const [publicMode, setPublicMode] = useState(false),
     [query, setQuery] = useState(""),
     [searched, setSearched] = useState(""),
+    [country, setCountry] = useState(""),
+    [searchedCountry, setSearchedCountry] = useState(""),
     [results, setResults] = useState<Course[] | null>(null),
     [next, setNext] = useState<number | null>(null);
   const heights = useRef<Record<string, number>>({});
   async function search(offset = 0) {
     await task.run(async () => {
       const q = offset ? searched : query;
-      const result = await golf.courses(q, offset);
+      const selectedCountry = offset ? searchedCountry : country;
+      const result = await golf.courses(q, offset, selectedCountry);
+      setSearchedCountry(selectedCountry);
       setSearched(q);
       setResults((current) =>
         offset ? [...(current ?? []), ...result.courses] : result.courses,
@@ -180,17 +187,13 @@ export function CoursesScreen() {
               letterSpacing: -0.4,
             }}
           >
-            {c.name}
+            {courseName(c)}
           </Txt>
         </View>
         <Txt style={{ color: colors.muted }}>
           {[
             c.city || c.region,
-            c.country_code === "KR"
-              ? t("countryKorea")
-              : c.country_code === "PH"
-                ? t("countryPhilippines")
-                : "",
+            c.country_code ? countryName(c.country_code, lang) : "",
           ]
             .filter(Boolean)
             .join(", ")}{" "}
@@ -304,6 +307,13 @@ export function CoursesScreen() {
       <Problem text={task.errorText || mine.errorText} />
       {publicMode ? (
         <>
+          <CountryPicker
+            value={country}
+            allowAll
+            disabled={task.busy}
+            testID="course-country-filter"
+            onChange={setCountry}
+          />
           <Field
             label={t("searchHint")}
             leadingIcon="search"
@@ -353,7 +363,7 @@ export function CoursesScreen() {
           ) : (
             <DragRow
               key={c.course_id}
-              label={t("drag") + " " + c.name}
+              label={t("drag") + " " + courseName(c)}
               disabled={task.busy}
               onDrop={(dy) => drop(i, dy)}
               onHeight={(height) => {
@@ -389,6 +399,7 @@ export function CourseEditor() {
       course_id: createId,
       name: "",
       region: "",
+      country_code: deviceCountry(),
       version: 0,
       segments: [{ name: "OUT", pars: Array(9).fill(4) }],
     };
@@ -425,6 +436,12 @@ export function CourseEditor() {
         />
       ) : (
         <>
+          <CountryPicker
+            value={current.country_code ?? ""}
+            disabled={task.busy || done}
+            testID="course-country"
+            onChange={(country_code) => edit({ ...current, country_code })}
+          />
           <Field
             label={t("courseName")}
             testID="course-name"

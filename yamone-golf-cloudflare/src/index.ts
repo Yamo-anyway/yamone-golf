@@ -232,7 +232,7 @@ export default {
     ]);
     if (env.ENVIRONMENT !== "test") {
       try {
-        await syncNextGolfCoreCatalogPage(env, "PH");
+        await syncNextGolfCoreCatalogPage(env);
       } catch (error) {
         console.error(
           "GolfCore catalog sync failed",

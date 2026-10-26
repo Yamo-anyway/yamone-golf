@@ -1,4 +1,4 @@
-// Recovered without behavioral changes from admin 0.3.22; see docs/SOURCE_INTEGRATION_20261026.md.
+// Recovered baseline from admin 0.3.22; later fixes are recorded in docs/STEP4_COURSE_DATA_20261026.md; see docs/SOURCE_INTEGRATION_20261026.md.
 import { ApiError, hash, now } from "./shared";
 import { ADMIN_COUNTRIES, isAdminCountryCode } from "../../shared/countries";
 const __name = (target, value) => Object.defineProperty(target, "name", { value, configurable: true });
@@ -125,14 +125,15 @@ async function fetchGolfCorePage(env, countryCode, offset, options = {}) {
   );
   if (!payload || !Array.isArray(payload.courses))
     throw new ApiError("golfcore_invalid_response", 502);
-  const courses = payload.courses.map(object2).filter((course) => !!course).filter((course) => {
-    try {
-      slug(course.slug);
-      return !!text2(course.name, 160);
-    } catch {
-      return false;
-    }
-  }).slice(0, limit2);
+  if (payload.courses.length > limit2) throw new ApiError("golfcore_invalid_response", 502);
+  const courses = payload.courses.map((item) => {
+    const course = object2(item);
+    if (!course || !text2(course.name, 160)) throw new ApiError("golfcore_invalid_response", 502);
+    slug(course.slug);
+    const itemCountry = text2(course.country, 2).toUpperCase();
+    if (itemCountry && itemCountry !== country) throw new ApiError("golfcore_invalid_response", 502);
+    return course;
+  });
   const total = integer2(payload.total);
   return {
     courses,
@@ -207,12 +208,12 @@ async function claimState(env, requestedCountry, forceComplete = false) {
     "SELECT * FROM golfcore_sync_state WHERE country_code=?"
   ).bind(requested).first() : await env.DB.prepare(
     `SELECT * FROM golfcore_sync_state
-         WHERE status IN ('pending','error')
+         WHERE country_code IN (${ADMIN_COUNTRIES.map(() => '?').join(',')}) AND (status IN ('pending','error')
             OR (status='running' AND updated_at<?)
-            OR (status='complete' AND COALESCE(last_completed_at,0)<?)
+            OR (status='complete' AND COALESCE(last_completed_at,0)<?))
          ORDER BY CASE status WHEN 'pending' THEN 0 WHEN 'error' THEN 1 WHEN 'running' THEN 2 ELSE 3 END,
                   priority LIMIT 1`
-  ).bind(staleLock, staleComplete).first();
+  ).bind(...ADMIN_COUNTRIES.map(country => country.code), staleLock, staleComplete).first();
   if (!row || row.status === "paused") return null;
   if (row.status === "complete" && !forceComplete && Number(row.last_completed_at || 0) >= staleComplete)
     return null;

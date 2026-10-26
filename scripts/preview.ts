@@ -16,7 +16,12 @@ const mime: Record<string, string> = {
 createServer(async (req, res) => {
   try {
     const url = new URL(req.url ?? "/", "http://localhost");
-    if (url.pathname.startsWith("/api/") || url.pathname === "/health") {
+    if (
+      url.pathname.startsWith("/api/") ||
+      url.pathname === "/health" ||
+      url.pathname === "/admin" ||
+      url.pathname.startsWith("/admin/")
+    ) {
       const chunks: Buffer[] = [];
       for await (const chunk of req) chunks.push(chunk);
       const headers = new Headers();
@@ -25,6 +30,7 @@ createServer(async (req, res) => {
         "authorization",
         "cookie",
         "origin",
+        "x-device-region",
       ]) {
         const value = req.headers[name];
         if (typeof value === "string") headers.set(name, value);

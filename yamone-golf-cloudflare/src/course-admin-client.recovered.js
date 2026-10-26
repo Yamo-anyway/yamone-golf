@@ -1,4 +1,4 @@
-// Recovered without behavioral changes from admin 0.3.22; see docs/SOURCE_INTEGRATION_20261026.md.
+// Recovered baseline from admin 0.3.22; later fixes are recorded in docs/STEP4_COURSE_DATA_20261026.md; see docs/SOURCE_INTEGRATION_20261026.md.
 import { formatCourseText } from "./course-presentation.js";
 
 var adminClient = String.raw`(() => {
@@ -172,19 +172,26 @@ var adminClient = String.raw`(() => {
   }
 
   async function login() {
+    const button = $("#admin-login");
+    if (button.disabled) return;
     const token = $("#admin-token").value.trim() || state.token;
     if (!token) return;
     state.token = token;
+    button.disabled = true;
+    button.setAttribute("aria-busy", "true");
     $("#login-error").textContent = "";
     try {
       await api("/admin/api/session");
       sessionStorage.setItem("ymg.course-admin", token);
-      $("#login-modal").classList.remove("open");
-      $("#login-modal").setAttribute("aria-hidden", "true");
       await loadOverview();
       await openDashboard();
+      $("#login-modal").classList.remove("open");
+      $("#login-modal").setAttribute("aria-hidden", "true");
     } catch (error) {
       $("#login-error").textContent = error.message;
+    } finally {
+      button.disabled = false;
+      button.setAttribute("aria-busy", "false");
     }
   }
 
@@ -278,6 +285,7 @@ var adminClient = String.raw`(() => {
 
   async function openCountry(code) {
     state.country = code;
+    $("#course-audit").hidden = true;
     state.courseOffset = 0;
     state.courseQuery = "";
     const country = state.overview.countries.find((item) => item.code === code);
@@ -300,7 +308,26 @@ var adminClient = String.raw`(() => {
     }
   }
 
+  async function auditCourses() {
+    const button = $("#audit-courses");
+    button.disabled = true;
+    const country = state.country;
+    try {
+      const report = await api("/admin/api/courses/audit?country=" + encodeURIComponent(country));
+      if (state.country !== country) return;
+      $("#course-audit").hidden = false;
+      const labels = {country_missing:"국가 미지정",country_invalid:"국가 오류",region_unclassified:"지역 미분류",translation_missing:"번역 누락",invalid_par:"홀·PAR 확인",duplicate_segment:"코스 이름 중복"};
+      $("#course-audit-summary").textContent = "검사 " + number(report.checked) + " / " + number(report.total) + "개 · " + (report.complete ? "전체 검사" : "최대 5,000개 일부 검사") + " · " + Object.entries(report.counts).map(([key,count]) => labels[key] + " " + number(count)).join(" · ") + " · 중복 후보 " + number(report.duplicate_groups) + "그룹";
+      const issues = report.issues.map(item => '<p><button type="button" class="button secondary" data-audit-course="' + escapeHtml(item.course_id) + '">' + escapeHtml(item.name) + '</button> ' + item.reasons.map(reason=>escapeHtml(labels[reason]||reason)).join(" · ") + '</p>').join("");
+      const duplicates = report.duplicates.map(group => '<p>중복 후보: ' + group.courses.map(item=>escapeHtml(item.name)).join(" / ") + ' (' + number(group.count) + '개)</p>').join("");
+      $("#course-audit-items").innerHTML = (issues + duplicates) || '<p>검토 후보가 없습니다.</p>';
+      $$("[data-audit-course]",$("#course-audit-items")).forEach(button=>button.addEventListener("click",()=>showCourse(button.dataset.auditCourse)));
+    } catch(error) { toast(error.message,true); }
+    finally {button.disabled=false;}
+  }
+
   async function loadCourses(offset) {
+    $("#course-audit").hidden = true;
     state.courseOffset = offset || 0;
     const query = new URLSearchParams({ country: state.country, status: "all", q: state.courseQuery, offset: String(state.courseOffset) });
     const data = await api("/admin/api/courses?" + query);
@@ -637,6 +664,7 @@ var adminClient = String.raw`(() => {
   $("#dashboard-all-countries").addEventListener("click", openCountryList);
   $("#dashboard-imports").addEventListener("click", openCountryList);
   $("#country-back").addEventListener("click", openCountryList);
+  $("#audit-courses").addEventListener("click", auditCourses);
   $("#open-deleted").addEventListener("click", openDeletedCourses);
   $("#deleted-back").addEventListener("click", () => openCountry(state.country));
   $("#add-course").addEventListener("click", openNewCourse);

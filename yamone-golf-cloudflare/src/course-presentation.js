@@ -118,3 +118,12 @@ export function validateLocalization(value) {
  }
  return JSON.stringify(out);
 }
+
+/** Search actual values, not JSON keys such as "ko", "en" or "local".
+ * @param {string} prefix */
+export function courseSearchSQL(prefix = '') {
+ const columns = ['name','region','city','address'].map(field => `COALESCE(${prefix}${field},'')`);
+ for (const field of ['name','address']) for (const language of ['ko','en','local'])
+  columns.push(`COALESCE(json_extract(${prefix}localized_json,'$.${field}.${language}'),'')`);
+ return `lower(${columns.join("||' '||")})`;
+}

@@ -1,5 +1,13 @@
 import ko from "./ko";
 const en: Record<keyof typeof ko, string> = {
+  courseCountry: "Country",
+  selectCountry: "Select a country",
+  countryFilter: "Filter by country",
+  allCountries: "All countries",
+  countrySearch: "Search country name or code",
+  countryNotFound: "No countries match your search.",
+  close: "Close",
+  country_unavailable: "Courses in this country are currently unavailable.",
   brand: "YAMONE GOLF",
   welcome: "Every stroke.\nEvery round.",
   intro: "Start with just a nickname.\nKeep your focus on the course.",

@@ -1,3 +1,4 @@
+import { randomBytes } from "node:crypto";
 import { spawn, type ChildProcess } from "node:child_process";
 import { setTimeout } from "node:timers/promises";
 async function stop(child: ChildProcess) {
@@ -8,6 +9,7 @@ async function stop(child: ChildProcess) {
   });
 }
 async function main() {
+  const adminToken = randomBytes(32).toString("hex");
   const apiPort = "8791",
     previewPort = "4181";
   const preview = spawn(
@@ -34,6 +36,7 @@ async function main() {
           "tests/scores-ui.ts",
           "tests/scorecard-flow-ui.ts",
           "tests/assets-ui.ts",
+          "tests/course-data-ui.ts",
           "tests/offline-ui.ts",
           "tests/ending-ui.ts",
           "tests/records-ui.ts",
@@ -52,6 +55,7 @@ async function main() {
           env: {
             ...process.env,
             UI_API_PORT: apiPort,
+            UI_COURSE_ADMIN_TOKEN: adminToken,
             UI_PREVIEW_PORT: previewPort,
           },
         },
@@ -79,6 +83,7 @@ async function main() {
             env: {
               ...process.env,
               PREVIEW_URL: `http://localhost:${previewPort}`,
+              UI_COURSE_ADMIN_TOKEN: adminToken,
             },
           });
           test.on("error", reject);

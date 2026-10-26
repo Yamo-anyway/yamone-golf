@@ -1,3 +1,4 @@
+import { deviceCountry } from "./device-country";
 import { Platform } from "react-native";
 import type {
   EmailCodeResult,
@@ -30,6 +31,7 @@ export async function request<T>(
 ): Promise<T> {
   const base = baseURL();
   const vault = await readVault();
+  const country = deviceCountry();
   const token = vault.pending?.device_secret ?? vault.secret;
   const abort = new AbortController();
   const timer = setTimeout(() => abort.abort(), 12000);
@@ -41,6 +43,7 @@ export async function request<T>(
       headers: {
         ...(value !== undefined ? { "Content-Type": "application/json" } : {}),
         ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        ...(country ? { "X-Device-Region": country } : {}),
       },
       body: value !== undefined ? JSON.stringify(value) : undefined,
     });
@@ -88,8 +91,7 @@ export const api = {
     request_id: string;
     email: string;
     language: "ko" | "en";
-  }) =>
-    request<EmailCodeResult>("/api/email-recovery/requests", "POST", value),
+  }) => request<EmailCodeResult>("/api/email-recovery/requests", "POST", value),
   claimEmailRecovery: (value: {
     request_id: string;
     code: string;

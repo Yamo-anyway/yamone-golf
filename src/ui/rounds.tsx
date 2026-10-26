@@ -1,3 +1,4 @@
+import { courseName } from "../data/course-presentation";
 import React, { useEffect, useRef, useState } from "react";
 import {
   Platform,
@@ -203,7 +204,7 @@ function CourseSummary({
           color: inverted ? "#FFFFFF" : colors.ink,
         }}
       >
-        {course.name}
+        {courseName(course)}
       </Txt>
       <Txt
         style={{
@@ -501,7 +502,7 @@ export function HomeRounds() {
             <React.Fragment key={r.round_id}>
               {i > 0 && <View style={layout.divider} />}
               <RoundRowAction
-                label={r.course.name}
+                label={courseName(r.course)}
                 detail={`${r.hole_count} ${t("hole")} · ${t("roundEndedTitle")}`}
                 icon="scorecard"
                 testID={"ended-round-" + r.round_id}

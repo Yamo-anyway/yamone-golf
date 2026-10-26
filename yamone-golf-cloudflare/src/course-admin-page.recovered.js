@@ -1,4 +1,4 @@
-// Recovered without behavioral changes from admin 0.3.22; see docs/SOURCE_INTEGRATION_20261026.md.
+// Recovered baseline from admin 0.3.22; later fixes are recorded in docs/STEP4_COURSE_DATA_20261026.md; see docs/SOURCE_INTEGRATION_20261026.md.
 import { adminClient } from "./course-admin-client.recovered.js";
 const __name = (target, value) => Object.defineProperty(target, "name", { value, configurable: true });
 
@@ -1096,11 +1096,17 @@ var html = `<!doctype html>
             <span class="inline-total">\uAC1C\uC778 <strong id="detail-private">247</strong></span>
           </div>
           <div class="detail-side">
+            <button class="button secondary" id="audit-courses" type="button">데이터 점검</button>
             <button class="button secondary" id="open-deleted" type="button"><svg class="icon" viewBox="0 0 24 24"><path d="M4 7h16M9 7V4h6v3M7 7l1 14h8l1-14"/></svg>삭제 목록</button>
             <button class="button secondary" id="add-course" type="button"><svg class="icon" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>골프장 추가</button>
           </div>
         </div>
 
+        <article class="card" id="course-audit" hidden style="padding:16px;margin-bottom:16px">
+          <h3>데이터 점검 · 검토 후보</h3><p id="course-audit-summary" role="status"></p>
+          <p>동일 국가·이름은 중복 후보입니다. 지점과 코스를 확인한 후 판단하며 자동 병합하지 않습니다.</p>
+          <div id="course-audit-items"></div>
+        </article>
         <article class="card course-card">
           <div class="course-toolbar"><div class="search-shell"><svg class="icon" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m20 20-4-4"/></svg><input class="search-input" id="course-search" type="search" placeholder="골프장 이름 또는 주소 검색" autocomplete="off"></div><span>한 페이지 10개</span></div>
           <div class="table-scroll">

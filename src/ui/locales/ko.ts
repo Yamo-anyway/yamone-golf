@@ -1,4 +1,12 @@
 export default {
+  courseCountry: "국가",
+  selectCountry: "국가 선택",
+  countryFilter: "국가로 찾기",
+  allCountries: "전체 국가",
+  countrySearch: "국가 이름 또는 코드 검색",
+  countryNotFound: "조건에 맞는 국가가 없습니다.",
+  close: "닫기",
+  country_unavailable: "현재 이 국가의 골프장을 사용할 수 없습니다.",
   brand: "YAMONE GOLF",
   welcome: "함께 치고,\n함께 기록해요.",
   intro: "닉네임 하나면 준비 끝.\n골프장에서 기록에만 집중하세요.",
