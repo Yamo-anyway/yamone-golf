@@ -52,6 +52,7 @@
     "export:android": "expo export --platform android --output-dir dist-android",
     "server": "npm run dev --workspace yamone-golf-cloudflare",
     "db:local": "npm run db:local --workspace yamone-golf-cloudflare",
+    "db:preflight": "node --import tsx scripts/db-preflight.ts",
     "preview": "node --import tsx scripts/preview.ts",
     "format": "prettier --write src tests scripts docs yamone-golf-cloudflare/src yamone-golf-cloudflare/tests",
     "assets:export": "node --import tsx scripts/export-assets.ts",

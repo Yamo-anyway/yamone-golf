@@ -167,7 +167,7 @@ async function main() {
     await a.page.getByTestId("keep-draft-and-move").click();
     await a.page
       .getByTestId("current-hole")
-      .filter({ hasText: "홀 2" })
+      .filter({ hasText: "2번홀" })
       .waitFor();
     await a.page.getByTestId("plus-" + second.slot_id).click();
     await a.page.getByTestId("scores-end-round").click();
