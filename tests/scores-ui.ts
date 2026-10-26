@@ -146,7 +146,7 @@ async function main() {
     await a.page.getByTestId("current-hole").waitFor();
     assert.equal(
       await a.page.getByTestId("current-hole").textContent(),
-      "홀 1 · PAR 4",
+      "1번홀 Par 4",
     );
     assert.equal(
       await a.page.getByTestId("score-state-" + self.slot_id).textContent(),
@@ -170,7 +170,7 @@ async function main() {
     await a.page.getByTestId("save-and-move").click();
     await a.page
       .getByTestId("current-hole")
-      .filter({ hasText: "홀 2" })
+      .filter({ hasText: "2번홀" })
       .waitFor();
     assert.equal(
       (await call(a.page, root + "/scores")).scores.find(
@@ -183,7 +183,7 @@ async function main() {
     await a.page.getByTestId("discard-and-move").click();
     await a.page
       .getByTestId("current-hole")
-      .filter({ hasText: "홀 3" })
+      .filter({ hasText: "3번홀" })
       .waitFor();
     assert.ok(
       !(await call(a.page, root + "/scores")).scores.some(
@@ -193,7 +193,7 @@ async function main() {
     await a.page.reload();
     await a.page
       .getByTestId("current-hole")
-      .filter({ hasText: "홀 3" })
+      .filter({ hasText: "3번홀" })
       .waitFor();
     await a.page.getByTestId("hole-1").click();
     await a.page.getByTestId("plus-" + self.slot_id).click(); // draft6
@@ -232,10 +232,9 @@ async function main() {
     await a.page.getByTestId("confirm-score-conflict").click();
     await a.page.getByText("야모: 10 → 8", { exact: true }).waitFor();
     await a.page.getByTestId("confirm-score-conflict").click();
-    await a.page
-      .getByTestId("score-notice")
-      .filter({ hasText: "서버에 저장" })
-      .waitFor();
+    await a.page.waitForURL(base + "/scorecard?id=" + round.round_id);
+    await a.page.getByTestId("scorecard-enter-scores").click();
+    await a.page.getByTestId("save-hole").waitFor();
     assert.equal(
       (await call(a.page, root + "/scores")).scores.find(
         (s: any) => s.slot_id === self.slot_id && s.hole === 1,
@@ -258,14 +257,13 @@ async function main() {
     await a.page.getByTestId("save-and-move").click();
     await a.page
       .getByTestId("current-hole")
-      .filter({ hasText: "홀 2" })
+      .filter({ hasText: "2번홀" })
       .waitFor();
     await a.page.getByTestId("hole-1").click();
     await a.page.getByTestId("save-hole").click();
-    await a.page
-      .getByTestId("score-notice")
-      .filter({ hasText: "서버에 저장" })
-      .waitFor();
+    await a.page.waitForURL(base + "/scorecard?id=" + round.round_id);
+    await a.page.getByTestId("scorecard-enter-scores").click();
+    await a.page.getByTestId("save-hole").waitFor();
     assert.equal(
       (await call(a.page, root + "/scores")).scores.find(
         (s: any) => s.slot_id === third.slot_id && s.hole === 1,
@@ -274,6 +272,13 @@ async function main() {
     );
     await a.page.getByTestId("delete-hole").click();
     await a.page.getByTestId("confirm-delete-hole").click();
+    await a.page
+      .getByTestId("score-value-" + self.slot_id)
+      .filter({ hasText: "—" })
+      .waitFor();
+    await a.page.getByTestId("save-hole").click();
+    await a.page.waitForURL(base + "/scorecard?id=" + round.round_id);
+    await a.page.goto(scoreURL);
     await a.page
       .getByTestId("score-state-" + self.slot_id)
       .filter({ hasText: "미입력" })

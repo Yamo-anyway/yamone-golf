@@ -329,6 +329,9 @@ export default {
   last_player: "마지막 플레이어는 삭제할 수 없습니다.",
   scoreEntry: "스코어 입력",
   scorecard: "스코어카드 · 순위",
+  scoreHoleNumber: "{hole}번홀",
+  roundRoom: "라운드 방",
+  deleteStaged: "점수를 비웠습니다. 저장하면 삭제됩니다.",
   holeScope: "이 홀의 내 입력 대상 전체",
   saveHole: "이 홀 저장",
   editHole: "이 홀 수정",
@@ -350,7 +353,7 @@ export default {
   saveAndMove: "저장 후 이동",
   discardAndMove: "저장하지 않고 이동",
   deleteHoleHelp:
-    "선택된 플레이어의 이 홀 점수를 미입력으로 바꿉니다. 다른 플레이어와 다른 홀의 기록은 유지됩니다.",
+    "선택한 플레이어의 이 홀 점수를 비웁니다. 저장을 눌러야 삭제되며, 취소하면 기존 점수가 유지됩니다.",
   scoreConflictTitle: "다른 기록자가 점수를 변경했어요",
   scoreConflictHelp:
     "아직 저장되지 않았습니다. 최신 점수 → 내 입력값으로 변경할까요?",

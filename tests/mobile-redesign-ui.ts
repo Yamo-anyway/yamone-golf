@@ -112,7 +112,9 @@ async function main() {
     );
     await shot("03-score-entry");
     await save.click();
-    await page.getByTestId("score-notice").waitFor();
+    await page.waitForURL(base + "/scorecard?id=" + round.round_id);
+    await page.getByTestId("scorecard-enter-scores").click();
+    await page.getByTestId("save-hole").waitFor();
     const saved = await api("/api/rounds/" + round.round_id + "/scores");
     assert.equal(
       saved.scores.filter(

@@ -140,14 +140,16 @@ export function ScoresScreen() {
     }
     if (q?.state === "blocked") return;
     setNotice(t(q ? "scoreQueued" : "holeSaved"));
-    const action = after ?? continuation.current;
+    const action = after ?? continuation.current ?? openScorecard;
     if (action) proceed.current = action;
     continuation.current = null;
   }
-  async function save(remove = false, after?: () => void) {
-    continuation.current = after ?? continuation.current;
+  const openScorecard = () =>
+    router.dismissTo({ pathname: "/scorecard", params: { id } });
+  async function save(after?: () => void) {
+    continuation.current = after ?? continuation.current ?? openScorecard;
     await task.run(async () => {
-      await store.enqueue(id, hole, remove);
+      await store.enqueue(id, hole);
       await completeSend(after);
     });
   }
@@ -303,8 +305,8 @@ export function ScoresScreen() {
                   style={scoreStyles.currentHole}
                 >
                   <Txt testID="current-hole" style={scoreStyles.holeTitle}>
-                    {t("hole")} {hole}
-                    <Txt style={scoreStyles.par}> · PAR {pars[hole - 1]}</Txt>
+                    {t("scoreHoleNumber").replace("{hole}", String(hole))}
+                    <Txt style={scoreStyles.par}> Par {pars[hole - 1]}</Txt>
                   </Txt>
                 </Pressable>
               );
@@ -344,9 +346,9 @@ export function ScoresScreen() {
               <Button
                 label={t("cancel")}
                 secondary
-                disabled={task.busy || !dirty || locked}
+                disabled={task.busy || locked}
                 testID="cancel-hole"
-                onPress={() => setLeave(() => () => {})}
+                onPress={() => discard(openScorecard)}
               />
             </View>
             <View style={{ flex: 1 }}>
@@ -355,7 +357,7 @@ export function ScoresScreen() {
                   pending
                     ? "syncNow"
                     : draft.deleting
-                      ? "deleteHole"
+                      ? "saveHole"
                       : existing
                         ? "editHole"
                         : "saveHole",
@@ -398,19 +400,6 @@ export function ScoresScreen() {
             </Txt>
           </View>
         )}
-        <View style={scoreStyles.scope}>
-          <Txt
-            style={{
-              flex: 1,
-              fontSize: 12,
-              lineHeight: 18,
-              color: colors.muted,
-            }}
-          >
-            {t("holeScope")}
-          </Txt>
-          <Txt style={{ fontSize: 13, fontWeight: "800" }}>{rows.length}</Txt>
-        </View>
         {!rows.length && (
           <Card>
             <Txt>{t("noScoreTargets")}</Txt>
@@ -529,7 +518,7 @@ export function ScoresScreen() {
             </View>
           );
         })}
-        {existing && !ended && (
+        {existing && !ended && !draft.deleting && (
           <Pressable
             accessibilityRole="button"
             accessibilityLabel={t("deleteHole")}
@@ -658,9 +647,7 @@ export function ScoresScreen() {
           secondary
           testID="open-scorecard"
           disabled={task.busy}
-          onPress={() =>
-            move(() => router.push({ pathname: "/scorecard", params: { id } }))
-          }
+          onPress={() => move(openScorecard)}
         />
         <Button
           label={t("inputTargets")}
@@ -729,7 +716,7 @@ export function ScoresScreen() {
             onPress={() => {
               const action = leave;
               setLeave(null);
-              void save(false, action);
+              void save(action);
             }}
           />
           <Button
@@ -760,6 +747,7 @@ export function ScoresScreen() {
             {t("hole")} {hole} · {t("deleteHole")}
           </Txt>
           <Txt>{t("deleteHoleHelp")}</Txt>
+          <Problem text={task.errorText} />
           <Txt>
             {rows
               .map(
@@ -770,9 +758,13 @@ export function ScoresScreen() {
           <Button
             label={t("deleteHole")}
             testID="confirm-delete-hole"
+            busy={task.busy}
             onPress={() => {
-              setDeleting(false);
-              void save(true);
+              void task.run(async () => {
+                await store.stageDelete(id, hole);
+                setDeleting(false);
+                setNotice(t("deleteStaged"));
+              });
             }}
           />
           <Button
@@ -878,7 +870,15 @@ export function ScorecardScreen() {
     { t, profile } = useSession(),
     offline = useOfflineScores(profile!.user_id),
     { store } = offline;
-  const sheet = offline.data.rounds[id]?.sheet;
+  const task = useTask();
+  const local = offline.data.rounds[id];
+  const sheet = local?.sheet;
+  const enterHole = (hole?: number) => {
+    void task.run(async () => {
+      if (hole !== undefined) await store.visit(id, hole);
+      router.push({ pathname: "/scores", params: { id } });
+    });
+  };
   const storeError =
     offline.error && offline.error !== "network"
       ? t(
@@ -902,33 +902,124 @@ export function ScorecardScreen() {
   return (
     <>
       <Heading title={t("scorecard")} />
-      <Problem text={storeError} />
+      <Problem text={task.errorText || storeError} />
       {sheet && (
         <>
           <Txt style={{ fontSize: 12, color: colors.muted }}>
             {t("cachedScorecardHelp")}
           </Txt>
-          <ScorecardContent sheet={sheet} />
+          {Object.keys(local?.queue ?? {}).length > 0 && (
+            <Txt
+              testID="scorecard-pending"
+              accessibilityLiveRegion="polite"
+              style={{ color: "#806225", fontSize: 13 }}
+            >
+              {t("pendingHoles")} {Object.keys(local?.queue ?? {}).length} ·{" "}
+              {t("scoreQueued")}
+            </Txt>
+          )}
+          <ScorecardContent
+            sheet={sheet}
+            onSelectHole={sheet.status === "active" ? enterHole : undefined}
+            actions={
+              <View
+                testID="scorecard-actions"
+                style={{ flexDirection: "row", flexWrap: "wrap", gap: 8 }}
+              >
+                {sheet.status === "active" && (
+                  <Button
+                    label={t("scoreEntry")}
+                    testID="scorecard-enter-scores"
+                    disabled={task.busy}
+                    onPress={() => enterHole()}
+                  />
+                )}
+                <Button
+                  label={t("roundRoom")}
+                  testID="scorecard-round-room"
+                  secondary
+                  disabled={task.busy}
+                  onPress={() =>
+                    router.navigate({ pathname: "/round", params: { id } })
+                  }
+                />
+                <Button
+                  label={t("refresh")}
+                  testID="refresh-scorecard"
+                  secondary
+                  onPress={() => void reload()}
+                />
+              </View>
+            }
+          />
         </>
       )}
-      <Button
-        label={t("refresh")}
-        testID="refresh-scorecard"
-        secondary
-        onPress={() => void reload()}
-      />
+      {!sheet && (
+        <Button
+          label={t("refresh")}
+          testID="refresh-scorecard"
+          secondary
+          onPress={() => void reload()}
+        />
+      )}
     </>
   );
 }
 
-export function ScorecardContent({ sheet }: { sheet: ScoreSheet }) {
+function ScorecardHole({
+  hole,
+  onSelect,
+  children,
+  testID,
+}: {
+  hole: number;
+  onSelect?: (hole: number) => void;
+  children: React.ReactNode;
+  testID: string;
+}) {
+  const { t } = useSession();
+  if (!onSelect)
+    return (
+      <View testID={testID} style={scoreStyles.cardCell}>
+        {children}
+      </View>
+    );
+  return (
+    <Pressable
+      testID={testID}
+      accessibilityRole="button"
+      accessibilityLabel={
+        t("scoreHoleNumber").replace("{hole}", String(hole)) +
+        " · " +
+        t("scoreEntry")
+      }
+      onPress={() => onSelect(hole)}
+      style={scoreStyles.cardCell}
+    >
+      {children}
+    </Pressable>
+  );
+}
+export function ScorecardContent({
+  sheet,
+  actions,
+  onSelectHole,
+}: {
+  sheet: ScoreSheet;
+  actions?: React.ReactNode;
+  onSelectHole?: (hole: number) => void;
+}) {
   const { t } = useSession();
   const [hole, setHole] = useState<number | null>(null);
   return (
     <>
-      <Txt style={{ fontSize: 20, lineHeight: 28, fontWeight: "800" }}>
+      <Txt
+        testID="scorecard-course-name"
+        style={{ fontSize: 20, lineHeight: 28, fontWeight: "800" }}
+      >
         {sheet.course.name}
       </Txt>
+      {actions}
 
       {sheet.course.segments.map((segment, half) => (
         <View
@@ -955,7 +1046,12 @@ export function ScorecardContent({ sheet }: { sheet: ScoreSheet }) {
             }}
           >
             {segment.pars.map((par, i) => (
-              <View key={i} style={{ flex: 1, alignItems: "center" }}>
+              <ScorecardHole
+                key={i}
+                hole={half * 9 + i + 1}
+                onSelect={onSelectHole}
+                testID={"card-hole-" + (half * 9 + i + 1)}
+              >
                 <Txt style={{ fontSize: 11, lineHeight: 18 }}>
                   {half * 9 + i + 1}
                 </Txt>
@@ -968,7 +1064,7 @@ export function ScorecardContent({ sheet }: { sheet: ScoreSheet }) {
                 >
                   P{par}
                 </Txt>
-              </View>
+              </ScorecardHole>
             ))}
             <View style={{ width: 34, alignItems: "center" }}>
               <Txt style={{ fontSize: 10, lineHeight: 18 }}>{t("total")}</Txt>
@@ -984,7 +1080,11 @@ export function ScorecardContent({ sheet }: { sheet: ScoreSheet }) {
               count = values.filter((v) => v !== null).length;
             return (
               <View key={p.slot_id} style={{ gap: 4 }}>
-                <Txt style={{ fontSize: 14, fontWeight: "600" }}>
+                <Txt
+                  testID={"card-player-name-" + half + "-" + p.slot_id}
+                  numberOfLines={2}
+                  style={{ fontSize: 14, fontWeight: "600" }}
+                >
                   {p.rank ?? "—"}. {p.name}{" "}
                   <Txt style={{ fontSize: 12, color: colors.muted }}>
                     ({count}/9)
@@ -992,9 +1092,16 @@ export function ScorecardContent({ sheet }: { sheet: ScoreSheet }) {
                 </Txt>
                 <View style={{ flexDirection: "row" }}>
                   {values.map((v, i) => (
-                    <View key={i} style={{ flex: 1, alignItems: "center" }}>
+                    <ScorecardHole
+                      key={i}
+                      hole={half * 9 + i + 1}
+                      onSelect={onSelectHole}
+                      testID={
+                        "card-score-" + p.slot_id + "-" + (half * 9 + i + 1)
+                      }
+                    >
                       <ScoreMark strokes={v} par={segment.pars[i]} />
-                    </View>
+                    </ScorecardHole>
                   ))}
                   <View
                     style={{
@@ -1070,6 +1177,7 @@ export function ScorecardContent({ sheet }: { sheet: ScoreSheet }) {
 }
 
 const scoreStyles = StyleSheet.create({
+  cardCell: { flex: 1, alignItems: "center", justifyContent: "center" },
   screen: { flex: 1, minHeight: 0 },
   fixedControls: {
     flexShrink: 0,
@@ -1157,7 +1265,6 @@ const scoreStyles = StyleSheet.create({
     gap: 12,
   },
   notice: { borderRadius: 12, paddingHorizontal: 12, paddingVertical: 10 },
-  scope: { flexDirection: "row", alignItems: "center", gap: 10 },
   player: {
     flexDirection: "row",
     alignItems: "center",

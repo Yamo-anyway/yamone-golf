@@ -320,6 +320,23 @@ export class OfflineScores {
       r.lastHole = hole;
     });
   }
+  async stageDelete(round: string, hole: number) {
+    await this.mutate((data) => {
+      const r = this.require(data, round);
+      if (r.endRequest) throw { code: "end_pending" };
+      if (r.queue[hole]) throw { code: "score_pending_locked" };
+      if (r.sheet.status !== "active") throw { code: "round_ended" };
+      const draft = r.drafts[hole] ?? draftFor(r.sheet, hole);
+      if (!draft.rows.length) throw { code: "invalid_targets" };
+      // Deletion remains a durable local draft until the user explicitly saves.
+      draft.deleting = true;
+      draft.rows.forEach((row) => {
+        row.edited = true;
+      });
+      r.drafts[hole] = draft;
+      r.lastHole = hole;
+    });
+  }
   async discard(round: string, hole: number) {
     await this.mutate((data) => {
       delete this.require(data, round).drafts[hole];

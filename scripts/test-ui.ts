@@ -32,6 +32,7 @@ async function main() {
           "tests/rounds-ui.ts",
           "tests/players-ui.ts",
           "tests/scores-ui.ts",
+          "tests/scorecard-flow-ui.ts",
           "tests/offline-ui.ts",
           "tests/ending-ui.ts",
           "tests/records-ui.ts",
@@ -56,7 +57,8 @@ async function main() {
       );
       try {
         let ready = false;
-        for (let attempt = 0; attempt < 100; attempt++) {
+        // A fresh D1 also loads the recovered regional classification dictionary.
+        for (let attempt = 0; attempt < 300; attempt++) {
           if (api.exitCode !== null || preview.exitCode !== null)
             throw Error("Test server exited");
           try {

@@ -325,6 +325,9 @@ const en: Record<keyof typeof ko, string> = {
   last_player: "The last player cannot be deleted.",
   scoreEntry: "Enter scores",
   scorecard: "Scorecard · Rankings",
+  scoreHoleNumber: "Hole {hole}",
+  roundRoom: "Round room",
+  deleteStaged: "Scores cleared. Save to apply the deletion.",
   holeScope: "All my selected players on this hole",
   saveHole: "Save this hole",
   editHole: "Update this hole",
@@ -346,7 +349,7 @@ const en: Record<keyof typeof ko, string> = {
   saveAndMove: "Save and continue",
   discardAndMove: "Discard and continue",
   deleteHoleHelp:
-    "Clear this hole for the selected players? Other players and holes keep their scores.",
+    "Clear this hole for the selected players. Save to apply the deletion, or cancel to keep the existing scores.",
   scoreConflictTitle: "Another scorer changed the score",
   scoreConflictHelp:
     "Nothing was saved. Change the latest score → your proposed score?",
