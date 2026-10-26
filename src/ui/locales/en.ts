@@ -61,7 +61,7 @@ const en: Record<keyof typeof ko, string> = {
   codeHelp: "Share this code so other players can find you.",
   qrShow: "Show my QR",
   qrHide: "Close QR",
-  qrLabel: "Personal QR for player linking",
+  qrLabel: "Personal QR for invitations and player linking",
   backupTitle: "Keep your recovery key safe",
   backupBody:
     "Use it to return to the same user if you lose your phone or reinstall the app. Unlike your personal code, keep this key private.",
@@ -171,7 +171,8 @@ const en: Record<keyof typeof ko, string> = {
   sendInvite: "Send invitation",
   inviteCode: "Companion’s personal code",
   inviteSent: "Invitation sent.",
-  inviteHelp: "The invitation appears on their home screen.",
+  inviteHelp:
+    "Enter your companion’s personal code or scan their QR. The invitation appears on their home screen.",
   stage2RoundHelp:
     "Manage players, choose your scoring list and enter scores. Ending rounds comes in a later stage.",
   pendingRound: "Pending round action",
@@ -285,13 +286,24 @@ const en: Record<keyof typeof ko, string> = {
   targetsSaved: "Your scoring list and order have been saved.",
   unsavedTargets: "These choices have not been saved yet.",
   selectedCount: "Selected players",
+  roundQRShow: "Show round QR",
+  roundQRHide: "Hide round QR",
+  roundQRLabel: "Round QR for joining this room",
+  roundQRHelp:
+    "Your companion can scan this on the join screen, check the course and host, then join.",
+  roundQRScan: "Scan round QR",
+  roundQRScanHelp:
+    "Point the camera at a round QR. You will review the room before joining.",
+  invalid_round_code:
+    "Check the round code or Yamone Golf round QR. A personal QR cannot be used to join a room.",
+  inviteRecipient: "Invite recipient",
   qrScan: "Scan personal QR",
   qrScanHelp: "Point the camera at your companion’s personal QR.",
   cameraHelp:
-    "Camera access is needed to read a personal QR. No photos or videos are saved.",
+    "Camera access is needed to read a QR code. No photos or videos are saved.",
   allowCamera: "Allow camera",
   cameraUnavailable:
-    "The camera is unavailable. Check permissions or enter the personal code instead.",
+    "The camera is unavailable. Check permissions or enter the code instead.",
   closeScan: "Close and enter code",
   invalid_personal_code: "Check the personal code or Yamone Golf personal QR.",
   player_not_found: "This player was deleted or cannot be found.",

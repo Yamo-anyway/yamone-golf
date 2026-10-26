@@ -379,7 +379,9 @@ async function main() {
     await b.page
       .getByTestId("correction-locked")
       .waitFor({ state: "detached" });
-    await b.page.getByRole("tab", { name: "홈", exact: true }).click();
+    // The editor was opened directly; its back arrow returns to the home tab.
+    await b.page.getByRole("button", { name: "돌아가기", exact: true }).click();
+    await b.page.waitForURL(base + "/");
     await b.page.getByTestId("home-records").waitFor();
     await call(b.page, "/api/me", { language: "en" }, "PATCH");
     await b.page.setViewportSize({ width: 320, height: 844 });

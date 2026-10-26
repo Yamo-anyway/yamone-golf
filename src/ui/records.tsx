@@ -1,3 +1,4 @@
+import { FlowNote } from "./round-flow";
 import React, { useRef, useState } from "react";
 import { View } from "react-native";
 import type { RecordFilter } from "../../shared/personal-records";
@@ -125,6 +126,17 @@ export function RecordsScreen() {
   return (
     <>
       <Heading title={t("recordsTitle")} />
+      <FlowNote
+        title={
+          lang === "ko"
+            ? "라운드 기록을 내 기록으로"
+            : "Keep a round in your records"
+        }
+      >
+        {lang === "ko"
+          ? "라운드 중 점수 작성은 방의 스코어 입력에서 합니다. 종료 후 ‘기록 받기’를 하면 전체 라운드가 내 기록에 추가됩니다."
+          : "Enter live scores inside the round. After it ends, receive the record to keep the entire round here."}
+      </FlowNote>
       <Button
         label={t("statisticsTitle")}
         secondary

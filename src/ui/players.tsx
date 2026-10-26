@@ -1,6 +1,6 @@
-import React, { useRef, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { Platform, View } from "react-native";
-import { useLocalSearchParams } from "expo-router";
+import { router, useLocalSearchParams } from "expo-router";
 import * as Crypto from "expo-crypto";
 import {
   players,
@@ -18,6 +18,7 @@ import { useSession } from "./session";
 import { Button, Card, colors, Field, styles, Txt } from "./components";
 import { Heading, Problem } from "./courses";
 import { confirm, useDraftGuard, useLoad, useTask } from "./golf-hooks";
+import { FlowNote } from "./round-flow";
 import { DragRow } from "./drag-row";
 import { QRScanner } from "./qr-scanner";
 export function useMutationId() {
@@ -30,11 +31,16 @@ export function useMutationId() {
   };
 }
 function PlayerLabel({ player }: { player: TargetPlayer }) {
-  const { t } = useSession();
+  const { t, profile, lang } = useSession();
   return (
     <View style={{ gap: 4 }}>
       <Txt style={{ fontSize: 20, lineHeight: 28, fontWeight: "700" }}>
         {player.name}
+        {player.user_id === profile!.user_id
+          ? lang === "ko"
+            ? " · 나"
+            : " · Me"
+          : ""}
       </Txt>
       <Txt style={{ color: colors.muted, fontSize: 14 }}>
         {t(player.user_id ? "linkedPlayer" : "unregistered")}
@@ -370,7 +376,7 @@ function PlayerEditor({
   );
 }
 export function PlayersScreen() {
-  const { t } = useSession(),
+  const { t, lang } = useSession(),
     { id } = useLocalSearchParams<{ id: string }>();
   const query = useLoad(() => players.roster(id));
   const [editor, setEditor] = useState<{ player: Player | null } | null>(null),
@@ -380,7 +386,17 @@ export function PlayersScreen() {
   return (
     <>
       <Heading title={t("playerManagement")} />
-      <Txt>{t("recorderHelp")}</Txt>
+      <FlowNote
+        title={
+          lang === "ko"
+            ? "이 변경은 방 전체에 적용돼요"
+            : "Changes apply to the whole room"
+        }
+      >
+        {lang === "ko"
+          ? "실제 플레이어의 이름과 사용자 연결을 관리합니다. 이름이 같아도 자동으로 연결하지 않아요. 나를 연결할 때도 개인 코드로 확인하세요."
+          : "Manage player names and linked users. Matching names are not linked automatically; confirm with a personal code."}
+      </FlowNote>
       <Problem text={query.errorText} />
       {saved && <Txt accessibilityRole="alert">{t("saved")}</Txt>}
       {editor && roster && (
@@ -435,13 +451,18 @@ export function PlayersScreen() {
   );
 }
 export function TargetsScreen() {
-  const { t } = useSession(),
+  const { t, lang } = useSession(),
     { id } = useLocalSearchParams<{ id: string }>();
   const query = useLoad(() => players.targets(id)),
     task = useTask();
   const makeId = useMutationId();
   const [draft, setDraft] = useState<Targets | null>(null),
     [saved, setSaved] = useState(false);
+  const [start, setStart] = useState(false);
+  useEffect(() => {
+    if (start && !draft)
+      router.replace({ pathname: "/scores", params: { id } });
+  }, [start, draft, id]);
   const heights = useRef<Record<string, number>>({});
   useDraftGuard(!!draft);
   const current = draft ?? query.data,
@@ -498,7 +519,17 @@ export function TargetsScreen() {
   return (
     <>
       <Heading title={t("inputTargets")} />
-      <Txt>{t("targetsHelp")}</Txt>
+      <FlowNote
+        title={
+          lang === "ko"
+            ? "내가 누구의 점수를 입력하나요?"
+            : "Whose scores will you enter?"
+        }
+      >
+        {lang === "ko"
+          ? "선택과 순서는 내 입력 화면에만 적용됩니다. 실제 플레이어 명단이나 다른 참여자의 입력 대상은 바뀌지 않아요."
+          : "Selection and order apply only to your scoring screen, not the shared roster or anyone else’s scoring list."}
+      </FlowNote>
       <Problem text={task.errorText || query.errorText} />
       {current && (
         <>
@@ -513,6 +544,44 @@ export function TargetsScreen() {
             )}
             {(stale || task.error === "targets_changed") && (
               <Txt accessibilityRole="alert">{t("targetDraftChanged")}</Txt>
+            )}
+            <Button
+              label={
+                lang === "ko"
+                  ? draft
+                    ? "저장하고 기록하기"
+                    : "선택한 대상 기록하기"
+                  : draft
+                    ? "Save & start scoring"
+                    : "Start scoring"
+              }
+              testID="start-recording"
+              busy={task.busy}
+              disabled={!active || current.slot_ids.length === 0}
+              onPress={() =>
+                void task.run(async () => {
+                  if (draft) {
+                    const value = {
+                      version: current.version,
+                      roster_version: current.roster_version,
+                      slot_ids: current.slot_ids,
+                    };
+                    query.setData(
+                      await players.saveTargets(id, value, makeId(value)),
+                    );
+                    setDraft(null);
+                    setSaved(true);
+                  }
+                  setStart(true);
+                })
+              }
+            />
+            {current.slot_ids.length === 0 && (
+              <Txt style={{ color: colors.muted }}>
+                {lang === "ko"
+                  ? "기록할 플레이어를 한 명 이상 선택하세요. 선택하지 않으면 스코어카드만 볼 수 있어요."
+                  : "Select at least one player to score. You can still view the scorecard with none selected."}
+              </Txt>
             )}
             <View style={{ flexDirection: "row", gap: 10 }}>
               <View style={{ flex: 1 }}>

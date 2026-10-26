@@ -1,1 +1,5 @@
-{"ios":{"NSCameraUsageDescription":"동반자의 개인 QR을 읽기 위해 카메라를 사용합니다. 사진이나 영상을 저장하지 않습니다."}}
+{
+  "ios": {
+    "NSCameraUsageDescription": "개인 QR과 라운드 QR을 읽기 위해 카메라를 사용합니다. 사진이나 영상을 저장하지 않습니다."
+  }
+}

@@ -1,5 +1,12 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Modal, Pressable, ScrollView, View } from "react-native";
+import {
+  Modal,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  useWindowDimensions,
+  View,
+} from "react-native";
 import { router, useLocalSearchParams, useFocusEffect } from "expo-router";
 import { useNavigation, usePreventRemove } from "expo-router/react-navigation";
 import {
@@ -49,6 +56,11 @@ function Dialog({
   );
 }
 export function ScoresScreen() {
+  const { height, width } = useWindowDimensions();
+  const compact = height < 520 && width > height;
+  const [choosingHole, setChoosingHole] = useState(false);
+  const holeStrip = useRef<ScrollView>(null),
+    playerScroll = useRef<ScrollView>(null);
   const { id } = useLocalSearchParams<{ id: string }>(),
     { t, profile, phase } = useSession(),
     navigation = useNavigation();
@@ -162,6 +174,15 @@ export function ScoresScreen() {
       setNotice(t("latestApplied"));
     });
   }
+  useEffect(() => {
+    playerScroll.current?.scrollTo({ y: 0, animated: false });
+  }, [hole]);
+  useEffect(() => {
+    holeStrip.current?.scrollTo({
+      x: Math.max(0, ((hole - 1) % 9) * 54 - (width - 96) / 2),
+      animated: false,
+    });
+  }, [hole, compact, choosingHole, width]);
   const storeError =
     offline.error &&
     offline.error !== "network" &&
@@ -172,6 +193,12 @@ export function ScoresScreen() {
             : "server_error",
         )
       : "";
+  useEffect(() => {
+    // A fixed Save action can fail while the last player is in view.
+    // Bring the alert into view instead of leaving it above the viewport.
+    if (task.errorText || storeError)
+      playerScroll.current?.scrollTo({ y: 0, animated: false });
+  }, [task.errorText, storeError]);
   if (!draft)
     return (
       <>
@@ -188,403 +215,509 @@ export function ScoresScreen() {
       (r) => scoreAt(sheet, r.slot_id, hole).strokes !== null,
     ),
     ended = latest?.status === "ended";
+  const holeButtons = Array.from(
+    { length: Math.min(9, sheet.hole_count - half * 9) },
+    (_, i) => half * 9 + i + 1,
+  ).map((h) => (
+    <Pressable
+      key={h}
+      testID={"hole-" + h}
+      accessibilityRole="button"
+      accessibilityLabel={t("hole") + " " + h}
+      accessibilityState={{ selected: h === hole, disabled: task.busy }}
+      disabled={task.busy}
+      onPress={() => {
+        setChoosingHole(false);
+        visit(h);
+      }}
+      style={({ pressed }) => [
+        scoreStyles.holeChip,
+        h === hole && scoreStyles.holeChipSelected,
+        { opacity: task.busy ? 0.45 : pressed ? 0.7 : 1 },
+      ]}
+    >
+      <Txt style={{ fontWeight: "800", fontSize: 17 }}>{h}</Txt>
+      {(local!.queue[h] || local!.drafts[h]) && (
+        <View
+          style={[
+            scoreStyles.holeDot,
+            { backgroundColor: local!.queue[h] ? "#A66D1C" : colors.green },
+          ]}
+        />
+      )}
+    </Pressable>
+  ));
   return (
-    <>
-      <Heading title={t("scoreEntry")} />
-      <Problem text={task.errorText || storeError} />
-      <View
-        style={{
-          gap: 6,
-          padding: 12,
-          backgroundColor: colors.mint,
-          borderRadius: 12,
-        }}
-      >
-        <Txt testID="offline-score-summary" style={{ fontSize: 13 }}>
-          {t("localDrafts")} {Object.keys(local!.drafts).length} ·{" "}
-          {t("pendingHoles")} {Object.keys(local!.queue).length}
-        </Txt>
-        {offline.syncing && (
-          <Txt style={{ fontSize: 12, color: colors.muted }}>
-            {t("syncingScores")}
-          </Txt>
-        )}
-      </View>
-      <View style={{ flexDirection: "row", gap: 8 }}>
-        {sheet.course.segments.map((seg, i) => (
-          <View key={i} style={{ flex: 1 }}>
-            <Button
-              label={t(i === 0 ? "frontNine" : "backNine")}
-              secondary={half !== i}
+    <View style={scoreStyles.screen}>
+      <View testID="score-fixed-controls" style={scoreStyles.fixedControls}>
+        <Heading title={t("scoreEntry")} />
+        <View style={scoreStyles.segmentBar}>
+          {sheet.course.segments.map((seg, i) => (
+            <Pressable
+              key={i}
+              accessibilityRole="button"
+              accessibilityState={{ selected: half === i, disabled: task.busy }}
               disabled={task.busy}
               onPress={() => visit(i * 9 + 1)}
-            />
-          </View>
-        ))}
-      </View>
-      <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 6 }}>
-        {Array.from({ length: 9 }, (_, i) => half * 9 + i + 1).map((h) => (
-          <Pressable
-            key={h}
-            testID={"hole-" + h}
-            accessibilityRole="button"
-            accessibilityLabel={t("hole") + " " + h}
-            accessibilityState={{ selected: h === hole }}
-            disabled={task.busy}
-            onPress={() => visit(h)}
-            style={{
-              minWidth: 44,
-              minHeight: 44,
-              borderRadius: 10,
-              alignItems: "center",
-              justifyContent: "center",
-              backgroundColor: h === hole ? colors.green : "#fff",
-              borderColor: colors.line,
-              borderWidth: 1,
-            }}
-          >
-            <Txt style={{ color: h === hole ? "#fff" : colors.ink }}>
-              {h}
-              {local!.queue[h] ? " ◦" : local!.drafts[h] ? " ·" : ""}
-            </Txt>
-          </Pressable>
-        ))}
-      </View>
-      <View style={{ gap: 10 }}>
-        <Txt
-          testID="current-hole"
-          style={{ fontSize: 24, lineHeight: 32, fontWeight: "800" }}
-        >
-          {t("hole")} {hole} · PAR {pars[hole - 1]}
-        </Txt>
-        <Txt style={{ color: colors.muted, fontSize: 14 }}>
-          {t("holeScope")} · {rows.length}
-        </Txt>
-        {ended ? (
-          <Txt>{t("round_ended")}</Txt>
-        ) : (
-          <>
-            <Button
-              label={t(
-                pending
-                  ? "syncNow"
-                  : draft.deleting
-                    ? "deleteHole"
-                    : existing
-                      ? "editHole"
-                      : "saveHole",
-              )}
-              testID="save-hole"
-              busy={task.busy}
-              disabled={
-                !!local?.endRequest ||
-                !rows.length ||
-                (pending && pending.state !== "queued")
-              }
-              onPress={() => void save()}
-            />
-            <View style={{ flexDirection: "row", gap: 8 }}>
-              <View style={{ flex: 1 }}>
-                <Button
-                  label={t("cancel")}
-                  secondary
-                  disabled={task.busy || !dirty || locked}
-                  testID="cancel-hole"
-                  onPress={() => setLeave(() => () => {})}
-                />
-              </View>
-              {existing && (
-                <View style={{ flex: 1 }}>
-                  <Button
-                    label={t("deleteHole")}
-                    secondary
-                    disabled={task.busy || locked}
-                    testID="delete-hole"
-                    onPress={() => setDeleting(true)}
-                  />
-                </View>
-              )}
-            </View>
-          </>
-        )}
-        {notice && (
-          <Txt accessibilityLiveRegion="polite" testID="score-notice">
-            {notice}
-          </Txt>
-        )}
-        {!rows.length && <Txt>{t("noScoreTargets")}</Txt>}
-        <View style={{ borderTopWidth: 1, borderColor: colors.line }}>
-          {rows.map((r) => {
-            const name =
-                sheet.players.find((p) => p.slot_id === r.slot_id)?.name ?? "",
-              base = scoreAt(sheet, r.slot_id, hole);
-            const change = (delta: number) => {
-              setNotice("");
-              void store.change(id, hole, r.slot_id, delta).catch(task.report);
-            };
-            return (
-              <View
-                key={r.slot_id}
-                testID={"score-row-" + r.slot_id}
+              style={({ pressed }) => [
+                scoreStyles.segment,
+                half === i && scoreStyles.segmentSelected,
+                { opacity: task.busy ? 0.45 : pressed ? 0.7 : 1 },
+              ]}
+            >
+              <Txt
+                numberOfLines={1}
                 style={{
-                  flexDirection: "row",
-                  alignItems: "center",
-                  gap: 6,
-                  paddingVertical: 10,
-                  borderBottomWidth: 1,
-                  borderColor: colors.line,
+                  fontSize: 14,
+                  fontWeight: "800",
+                  color: half === i ? "#fff" : colors.muted,
                 }}
               >
-                <View style={{ flex: 1, minWidth: 0 }}>
-                  <Txt numberOfLines={2} style={{ fontWeight: "700" }}>
-                    {name}
+                {t(i === 0 ? "frontNine" : "backNine")}
+              </Txt>
+            </Pressable>
+          ))}
+        </View>
+        {!compact && !choosingHole && (
+          <ScrollView
+            ref={holeStrip}
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            style={scoreStyles.holeStrip}
+            contentContainerStyle={scoreStyles.holeStripContent}
+          >
+            {holeButtons}
+          </ScrollView>
+        )}
+        <View style={scoreStyles.holeControl}>
+          {[-1, 0, 1].map((delta) => {
+            if (delta === 0)
+              return (
+                <Pressable
+                  key={delta}
+                  testID="choose-score-hole"
+                  accessibilityRole="button"
+                  accessibilityLabel={t("hole") + " " + hole}
+                  onPress={() => setChoosingHole(true)}
+                  disabled={task.busy}
+                  style={scoreStyles.currentHole}
+                >
+                  <Txt testID="current-hole" style={scoreStyles.holeTitle}>
+                    {t("hole")} {hole}
+                    <Txt style={scoreStyles.par}> · PAR {pars[hole - 1]}</Txt>
                   </Txt>
-                  <Txt
-                    testID={"score-state-" + r.slot_id}
-                    style={{
-                      fontSize: 12,
-                      lineHeight: 18,
-                      color: r.edited ? "#806225" : colors.muted,
-                    }}
-                  >
-                    {t(
-                      pending
-                        ? pending.state === "queued"
-                          ? "scoreQueued"
-                          : "scoreHeld"
-                        : r.edited
-                          ? "scoreUnsaved"
-                          : base.strokes === null
-                            ? "scoreDefault"
-                            : "scoreSaved",
-                    )}
-                  </Txt>
-                </View>
-                {[-1, 1].map((delta, i) => (
-                  <View
-                    key={delta}
-                    style={{
-                      flexDirection: "row",
-                      alignItems: "center",
-                      gap: 6,
-                    }}
-                  >
-                    {i === 1 && (
-                      <Txt
-                        testID={"score-value-" + r.slot_id}
-                        style={{
-                          fontSize: 23,
-                          lineHeight: 30,
-                          minWidth: 32,
-                          textAlign: "center",
-                        }}
-                      >
-                        {draft.deleting ? "—" : r.strokes}
-                      </Txt>
-                    )}
+                </Pressable>
+              );
+            const disabled =
+              task.busy || (delta < 0 ? hole === 1 : hole === sheet.hole_count);
+            return (
+              <Pressable
+                key={delta}
+                testID={delta < 0 ? "previous-score-hole" : "next-score-hole"}
+                accessibilityRole="button"
+                accessibilityLabel={t(delta < 0 ? "previousHole" : "nextHole")}
+                accessibilityState={{ disabled }}
+                disabled={disabled}
+                onPress={() => visit(hole + delta)}
+                style={({ pressed }) => [
+                  scoreStyles.arrow,
+                  { opacity: disabled ? 0.3 : pressed ? 0.6 : 1 },
+                ]}
+              >
+                <View
+                  style={[
+                    scoreStyles.chevron,
+                    {
+                      transform: [{ rotate: delta < 0 ? "135deg" : "-45deg" }],
+                    },
+                  ]}
+                />
+              </Pressable>
+            );
+          })}
+        </View>
+        {ended ? (
+          <Txt style={scoreStyles.ended}>{t("round_ended")}</Txt>
+        ) : (
+          <View testID="score-fixed-actions" style={scoreStyles.actionRow}>
+            <View style={{ width: 88 }}>
+              <Button
+                label={t("cancel")}
+                secondary
+                disabled={task.busy || !dirty || locked}
+                testID="cancel-hole"
+                onPress={() => setLeave(() => () => {})}
+              />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Button
+                label={t(
+                  pending
+                    ? "syncNow"
+                    : draft.deleting
+                      ? "deleteHole"
+                      : existing
+                        ? "editHole"
+                        : "saveHole",
+                )}
+                testID="save-hole"
+                busy={task.busy}
+                disabled={
+                  !!local?.endRequest ||
+                  !rows.length ||
+                  (pending && pending.state !== "queued")
+                }
+                onPress={() => void save()}
+              />
+            </View>
+          </View>
+        )}
+      </View>
+      <ScrollView
+        ref={playerScroll}
+        testID="score-player-scroll"
+        style={scoreStyles.body}
+        contentContainerStyle={scoreStyles.bodyContent}
+        keyboardShouldPersistTaps="handled"
+        showsVerticalScrollIndicator={false}
+      >
+        <Problem text={task.errorText || storeError} />
+        {!!notice && (
+          <View
+            style={[
+              scoreStyles.notice,
+              { backgroundColor: pending ? "#FFF3DB" : colors.mint },
+            ]}
+          >
+            <Txt
+              accessibilityLiveRegion="polite"
+              testID="score-notice"
+              style={{ fontSize: 14, fontWeight: "700" }}
+            >
+              {notice}
+            </Txt>
+          </View>
+        )}
+        <View style={scoreStyles.scope}>
+          <Txt
+            style={{
+              flex: 1,
+              fontSize: 12,
+              lineHeight: 18,
+              color: colors.muted,
+            }}
+          >
+            {t("holeScope")}
+          </Txt>
+          <Txt style={{ fontSize: 13, fontWeight: "800" }}>{rows.length}</Txt>
+        </View>
+        {!rows.length && (
+          <Card>
+            <Txt>{t("noScoreTargets")}</Txt>
+          </Card>
+        )}
+        {rows.map((r) => {
+          const name =
+              sheet.players.find((p) => p.slot_id === r.slot_id)?.name ?? "",
+            base = scoreAt(sheet, r.slot_id, hole);
+          const change = (delta: number) => {
+            setNotice("");
+            void store.change(id, hole, r.slot_id, delta).catch(task.report);
+          };
+          return (
+            <View
+              key={r.slot_id}
+              testID={"score-row-" + r.slot_id}
+              style={[
+                scoreStyles.player,
+                r.edited && { borderColor: "#C7A95F" },
+              ]}
+            >
+              <View style={{ flex: 1, minWidth: 0 }}>
+                <Txt
+                  numberOfLines={2}
+                  style={{ fontWeight: "800", fontSize: 16, lineHeight: 22 }}
+                >
+                  {name}
+                </Txt>
+                <Txt
+                  testID={"score-state-" + r.slot_id}
+                  style={{
+                    fontSize: 11,
+                    lineHeight: 16,
+                    color: r.edited ? "#806225" : colors.muted,
+                    marginTop: 5,
+                  }}
+                >
+                  {t(
+                    pending
+                      ? pending.state === "queued"
+                        ? "scoreQueued"
+                        : "scoreHeld"
+                      : r.edited
+                        ? "scoreUnsaved"
+                        : base.strokes === null
+                          ? "scoreDefault"
+                          : "scoreSaved",
+                  )}
+                </Txt>
+              </View>
+              <View style={scoreStyles.stepper}>
+                {[-1, 0, 1].map((delta) => {
+                  if (delta === 0)
+                    return (
+                      <View key={delta} style={scoreStyles.scoreNumber}>
+                        <Txt
+                          testID={"score-value-" + r.slot_id}
+                          style={scoreStyles.strokes}
+                        >
+                          {draft.deleting ? "—" : r.strokes}
+                        </Txt>
+                        <Txt
+                          style={{
+                            fontSize: 10,
+                            lineHeight: 13,
+                            color: colors.muted,
+                          }}
+                        >
+                          {draft.deleting
+                            ? ""
+                            : r.strokes === pars[hole - 1]
+                              ? "PAR"
+                              : `${r.strokes > pars[hole - 1] ? "+" : ""}${r.strokes - pars[hole - 1]}`}
+                        </Txt>
+                      </View>
+                    );
+                  const disabled =
+                    task.busy ||
+                    locked ||
+                    draft.deleting ||
+                    ended ||
+                    r.strokes === (delta < 0 ? 1 : 999);
+                  return (
                     <Pressable
+                      key={delta}
                       accessibilityRole="button"
                       accessibilityLabel={
                         name +
                         " " +
                         t(delta < 0 ? "decreaseScore" : "increaseScore")
                       }
+                      accessibilityState={{ disabled: !!disabled }}
                       testID={(delta < 0 ? "minus-" : "plus-") + r.slot_id}
-                      disabled={
-                        task.busy ||
-                        locked ||
-                        draft.deleting ||
-                        ended ||
-                        r.strokes === (delta < 0 ? 1 : 999)
-                      }
+                      disabled={disabled}
                       onPress={() => change(delta)}
-                      style={{
-                        width: 44,
-                        height: 44,
-                        alignItems: "center",
-                        justifyContent: "center",
-                        borderRadius: 10,
-                        backgroundColor: "#fff",
-                        borderWidth: 1,
-                        borderColor: colors.line,
-                      }}
+                      style={({ pressed }) => [
+                        scoreStyles.step,
+                        delta > 0 && scoreStyles.stepPlus,
+                        { opacity: disabled ? 0.35 : pressed ? 0.65 : 1 },
+                      ]}
                     >
-                      <Txt style={{ fontSize: 24 }}>
+                      <Txt
+                        style={{
+                          fontSize: 25,
+                          lineHeight: 30,
+                          color: delta > 0 ? "#fff" : colors.ink,
+                        }}
+                      >
                         {delta < 0 ? "−" : "+"}
                       </Txt>
                     </Pressable>
-                  </View>
-                ))}
+                  );
+                })}
               </View>
-            );
-          })}
-        </View>
-      </View>
-      <View style={{ flexDirection: "row", gap: 8 }}>
-        <View style={{ flex: 1 }}>
-          <Button
-            label={t("previousHole")}
-            secondary
-            disabled={hole === 1 || task.busy}
-            onPress={() => visit(hole - 1)}
-          />
-        </View>
-        <View style={{ flex: 1 }}>
-          <Button
-            label={t("nextHole")}
-            secondary
-            disabled={hole === sheet.hole_count || task.busy}
-            onPress={() => visit(hole + 1)}
-          />
-        </View>
-      </View>
-      {pending?.state === "conflict" && (
-        <Button
-          label={t("reviewScoreConflict")}
-          testID="review-score-conflict"
-          onPress={() => setHiddenConflict("")}
-        />
-      )}
-      {pending?.state === "blocked" && (
-        <Card>
-          <Txt style={{ fontWeight: "700" }}>{t("scoreHeld")}</Txt>
-          <Txt>
-            {t(
-              pending.error === "round_ended"
-                ? "endedOfflineHold"
-                : "blockedOfflineHold",
-            )}
-          </Txt>
-          <Problem
-            text={t(
-              pending.error && pending.error in ko
-                ? (pending.error as keyof typeof ko)
-                : "state_changed",
-            )}
-          />
-          {pending.write.entries.map((e) => (
-            <Txt selectable key={e.slot_id}>
-              {
-                pending.draft.sheet.players.find((p) => p.slot_id === e.slot_id)
-                  ?.name
-              }
-              : {e.strokes ?? t("notEntered")}
+            </View>
+          );
+        })}
+        {existing && !ended && (
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel={t("deleteHole")}
+            accessibilityState={{ disabled: task.busy || locked }}
+            disabled={task.busy || locked}
+            testID="delete-hole"
+            onPress={() => setDeleting(true)}
+            style={({ pressed }) => [
+              scoreStyles.deleteAction,
+              { opacity: task.busy || locked ? 0.35 : pressed ? 0.6 : 1 },
+            ]}
+          >
+            <Txt style={{ color: colors.error, fontSize: 13 }}>
+              {t("deleteHole")} · {t("hole")} {hole}
             </Txt>
-          ))}
-          {["targets_changed", "state_changed"].includes(
-            pending.error ?? "",
-          ) && (
+          </Pressable>
+        )}
+        {pending?.state === "conflict" && (
+          <Button
+            label={t("reviewScoreConflict")}
+            testID="review-score-conflict"
+            onPress={() => setHiddenConflict("")}
+          />
+        )}
+        {pending?.state === "blocked" && (
+          <Card>
+            <Txt style={{ fontWeight: "700" }}>{t("scoreHeld")}</Txt>
+            <Txt>
+              {t(
+                pending.error === "round_ended"
+                  ? "endedOfflineHold"
+                  : "blockedOfflineHold",
+              )}
+            </Txt>
+            <Problem
+              text={t(
+                pending.error && pending.error in ko
+                  ? (pending.error as keyof typeof ko)
+                  : "state_changed",
+              )}
+            />
+            {pending.write.entries.map((e) => (
+              <Txt selectable key={e.slot_id}>
+                {
+                  pending.draft.sheet.players.find(
+                    (p) => p.slot_id === e.slot_id,
+                  )?.name
+                }
+                : {e.strokes ?? t("notEntered")}
+              </Txt>
+            ))}
+            {["targets_changed", "state_changed"].includes(
+              pending.error ?? "",
+            ) && (
+              <Button
+                label={t("reprepareScores")}
+                onPress={() => {
+                  void task.run(async () => {
+                    await store.refresh(id);
+                    setReviewBlocked(true);
+                  });
+                }}
+              />
+            )}
+          </Card>
+        )}
+        {reviewBlocked && pending && (
+          <Dialog onClose={() => setReviewBlocked(false)}>
+            <Txt>{t("reprepareHelp")}</Txt>
+            {pending.write.entries.every((e) => e.strokes === null) && (
+              <Txt>{t("reprepareDeleteHelp")}</Txt>
+            )}
+            <Txt>
+              {latest?.slot_ids
+                .map((id) => latest.players.find((p) => p.slot_id === id)?.name)
+                .join(", ")}
+            </Txt>
+            <Txt>
+              {t("excludedDraftPlayers")}:{" "}
+              {pending.draft.rows
+                .filter((r) => !latest?.slot_ids.includes(r.slot_id))
+                .map(
+                  (r) =>
+                    pending.draft.sheet.players.find(
+                      (p) => p.slot_id === r.slot_id,
+                    )?.name,
+                )
+                .join(", ") || "—"}
+            </Txt>
             <Button
               label={t("reprepareScores")}
-              onPress={() => {
+              onPress={() =>
                 void task.run(async () => {
-                  await store.refresh(id);
-                  setReviewBlocked(true);
-                });
-              }}
+                  await store.reprepare(id, hole);
+                  setReviewBlocked(false);
+                })
+              }
             />
+            <Button
+              label={t("cancel")}
+              secondary
+              onPress={() => setReviewBlocked(false)}
+            />
+          </Dialog>
+        )}
+        <Button
+          label={t(
+            local?.endRequest
+              ? "retryEnd"
+              : ended
+                ? "roundEndedTitle"
+                : "endRound",
+          )}
+          secondary
+          testID="scores-end-round"
+          disabled={task.busy}
+          onPress={() =>
+            move(() =>
+              router.push({ pathname: "/round-ending", params: { id } }),
+            )
+          }
+        />
+        {local?.endRequest && <Txt>{t("end_pending")}</Txt>}
+        <Button
+          label={t("scorecard")}
+          secondary
+          testID="open-scorecard"
+          disabled={task.busy}
+          onPress={() =>
+            move(() => router.push({ pathname: "/scorecard", params: { id } }))
+          }
+        />
+        <Button
+          label={t("inputTargets")}
+          secondary
+          disabled={task.busy}
+          onPress={() =>
+            move(() =>
+              router.push({ pathname: "/input-targets", params: { id } }),
+            )
+          }
+        />
+        <Button
+          label={t("refresh")}
+          secondary
+          testID="refresh-scores"
+          disabled={task.busy}
+          onPress={() => void reload()}
+        />
+        <Card>
+          <Txt
+            testID="offline-score-summary"
+            style={{ fontSize: 12, fontWeight: "700" }}
+          >
+            {t("localDrafts")} {Object.keys(local!.drafts).length} ·{" "}
+            {t("pendingHoles")} {Object.keys(local!.queue).length}
+          </Txt>
+          <Txt style={{ fontSize: 12, color: colors.muted }}>
+            {t(offline.syncing ? "syncingScores" : "offlineScoreHelp")}
+          </Txt>
+          {Object.keys(local!.drafts).length > 0 && (
+            <Txt testID="draft-holes" style={{ fontSize: 12 }}>
+              {t("draftHoles")}: {Object.keys(local!.drafts).join(", ")}
+            </Txt>
+          )}
+          {Object.keys(local!.queue).length > 0 && (
+            <Txt testID="queued-holes" style={{ fontSize: 12 }}>
+              {t("queuedHoles")}: {Object.keys(local!.queue).join(", ")}
+            </Txt>
           )}
         </Card>
-      )}
-      {reviewBlocked && pending && (
-        <Dialog onClose={() => setReviewBlocked(false)}>
-          <Txt>{t("reprepareHelp")}</Txt>
-          {pending.write.entries.every((e) => e.strokes === null) && (
-            <Txt>{t("reprepareDeleteHelp")}</Txt>
-          )}
-          <Txt>
-            {latest?.slot_ids
-              .map((id) => latest.players.find((p) => p.slot_id === id)?.name)
-              .join(", ")}
-          </Txt>
-          <Txt>
-            {t("excludedDraftPlayers")}:{" "}
-            {pending.draft.rows
-              .filter((r) => !latest?.slot_ids.includes(r.slot_id))
-              .map(
-                (r) =>
-                  pending.draft.sheet.players.find(
-                    (p) => p.slot_id === r.slot_id,
-                  )?.name,
-              )
-              .join(", ") || "—"}
-          </Txt>
-          <Button
-            label={t("reprepareScores")}
-            onPress={() =>
-              void task.run(async () => {
-                await store.reprepare(id, hole);
-                setReviewBlocked(false);
-              })
-            }
-          />
+        <Txt style={{ fontSize: 13, color: colors.muted }}>
+          {t("scoreRefreshHelp")}
+        </Txt>
+      </ScrollView>
+      {choosingHole && (
+        <Dialog onClose={() => setChoosingHole(false)}>
+          <Txt style={{ fontSize: 20, fontWeight: "800" }}>{t("hole")}</Txt>
+          <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 12 }}>
+            {holeButtons}
+          </View>
           <Button
             label={t("cancel")}
             secondary
-            onPress={() => setReviewBlocked(false)}
+            onPress={() => setChoosingHole(false)}
           />
         </Dialog>
       )}
-      <Button
-        label={t(
-          local?.endRequest
-            ? "retryEnd"
-            : ended
-              ? "roundEndedTitle"
-              : "endRound",
-        )}
-        secondary
-        testID="scores-end-round"
-        disabled={task.busy}
-        onPress={() =>
-          move(() => router.push({ pathname: "/round-ending", params: { id } }))
-        }
-      />
-      {local?.endRequest && <Txt>{t("end_pending")}</Txt>}
-      <Button
-        label={t("scorecard")}
-        secondary
-        testID="open-scorecard"
-        disabled={task.busy}
-        onPress={() =>
-          move(() => router.push({ pathname: "/scorecard", params: { id } }))
-        }
-      />
-      <Button
-        label={t("inputTargets")}
-        secondary
-        disabled={task.busy}
-        onPress={() =>
-          move(() =>
-            router.push({ pathname: "/input-targets", params: { id } }),
-          )
-        }
-      />
-      <Button
-        label={t("refresh")}
-        secondary
-        testID="refresh-scores"
-        disabled={task.busy}
-        onPress={() => void reload()}
-      />
-      <Card>
-        <Txt style={{ fontSize: 12, color: colors.muted }}>
-          {t(offline.syncing ? "syncingScores" : "offlineScoreHelp")}
-        </Txt>
-        {Object.keys(local!.drafts).length > 0 && (
-          <Txt testID="draft-holes" style={{ fontSize: 12 }}>
-            {t("draftHoles")}: {Object.keys(local!.drafts).join(", ")}
-          </Txt>
-        )}
-        {Object.keys(local!.queue).length > 0 && (
-          <Txt testID="queued-holes" style={{ fontSize: 12 }}>
-            {t("queuedHoles")}: {Object.keys(local!.queue).join(", ")}
-          </Txt>
-        )}
-      </Card>
-      <Txt style={{ fontSize: 13, color: colors.muted }}>
-        {t("scoreRefreshHelp")}
-      </Txt>
       {leave && !conflict && (
         <Dialog onClose={() => setLeave(null)}>
           <Txt style={{ fontWeight: "800" }}>{t("scoreLeaveTitle")}</Txt>
@@ -623,6 +756,9 @@ export function ScoresScreen() {
       )}
       {deleting && (
         <Dialog onClose={() => setDeleting(false)}>
+          <Txt style={{ fontSize: 20, fontWeight: "800" }}>
+            {t("hole")} {hole} · {t("deleteHole")}
+          </Txt>
           <Txt>{t("deleteHoleHelp")}</Txt>
           <Txt>
             {rows
@@ -691,7 +827,7 @@ export function ScoresScreen() {
           />
         </Dialog>
       )}
-    </>
+    </View>
   );
 }
 function ScoreMark({ strokes, par }: { strokes: number | null; par: number }) {
@@ -790,23 +926,34 @@ export function ScorecardContent({ sheet }: { sheet: ScoreSheet }) {
   const [hole, setHole] = useState<number | null>(null);
   return (
     <>
-      <Txt>{sheet.course.name}</Txt>
+      <Txt style={{ fontSize: 20, lineHeight: 28, fontWeight: "800" }}>
+        {sheet.course.name}
+      </Txt>
 
       {sheet.course.segments.map((segment, half) => (
         <View
           key={half}
           testID={"card-half-" + half}
           style={{
-            gap: 10,
-            paddingVertical: 16,
-            borderTopWidth: 1,
+            gap: 12,
+            padding: 12,
+            borderWidth: 1,
             borderColor: colors.line,
+            borderRadius: 18,
+            backgroundColor: "#fff",
           }}
         >
           <Txt style={{ fontWeight: "800" }}>
             {t(half === 0 ? "frontNine" : "backNine")} · {segment.name}
           </Txt>
-          <View style={{ flexDirection: "row" }}>
+          <View
+            style={{
+              flexDirection: "row",
+              backgroundColor: colors.mint,
+              paddingVertical: 8,
+              borderRadius: 10,
+            }}
+          >
             {segment.pars.map((par, i) => (
               <View key={i} style={{ flex: 1, alignItems: "center" }}>
                 <Txt style={{ fontSize: 11, lineHeight: 18 }}>
@@ -895,8 +1042,8 @@ export function ScorecardContent({ sheet }: { sheet: ScoreSheet }) {
                 accessibilityRole="button"
                 onPress={() => setHole(h)}
                 style={{
-                  minWidth: 44,
-                  minHeight: 44,
+                  minWidth: 48,
+                  minHeight: 48,
                   alignItems: "center",
                   justifyContent: "center",
                   backgroundColor: hole === h ? colors.mint : undefined,
@@ -921,3 +1068,130 @@ export function ScorecardContent({ sheet }: { sheet: ScoreSheet }) {
     </>
   );
 }
+
+const scoreStyles = StyleSheet.create({
+  screen: { flex: 1, minHeight: 0 },
+  fixedControls: {
+    flexShrink: 0,
+    paddingHorizontal: 16,
+    paddingTop: 8,
+    gap: 8,
+    paddingBottom: 12,
+    borderBottomWidth: 1,
+    borderColor: colors.line,
+  },
+  segmentBar: {
+    flexDirection: "row",
+    gap: 4,
+    backgroundColor: "#E8ECE5",
+    borderRadius: 14,
+    padding: 3,
+  },
+  segment: {
+    flex: 1,
+    minHeight: 48,
+    alignItems: "center",
+    justifyContent: "center",
+    borderRadius: 11,
+    paddingHorizontal: 8,
+  },
+  segmentSelected: { backgroundColor: "#174E3F" },
+  holeStrip: { flexGrow: 0, flexShrink: 0 },
+  holeStripContent: { gap: 6, paddingVertical: 2 },
+  holeChip: {
+    width: 48,
+    minHeight: 48,
+    alignItems: "center",
+    justifyContent: "center",
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: colors.line,
+    backgroundColor: "#fff",
+  },
+  holeChipSelected: { backgroundColor: "#DAEE94", borderColor: "#C6DD78" },
+  holeDot: {
+    width: 4,
+    height: 4,
+    borderRadius: 2,
+    position: "absolute",
+    bottom: 5,
+  },
+  holeControl: { flexDirection: "row", alignItems: "center", gap: 8 },
+  arrow: {
+    width: 48,
+    height: 48,
+    alignItems: "center",
+    justifyContent: "center",
+    borderRadius: 12,
+    backgroundColor: "#fff",
+    borderWidth: 1,
+    borderColor: colors.line,
+  },
+  chevron: {
+    width: 10,
+    height: 10,
+    borderRightWidth: 2,
+    borderBottomWidth: 2,
+    borderColor: "#174E3F",
+  },
+  currentHole: {
+    flex: 1,
+    minHeight: 48,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  holeTitle: { fontSize: 23, lineHeight: 32, fontWeight: "800" },
+  par: { fontSize: 14, lineHeight: 24, color: colors.muted, fontWeight: "700" },
+  actionRow: { flexDirection: "row", gap: 8, alignItems: "stretch" },
+  ended: {
+    minHeight: 48,
+    paddingVertical: 12,
+    textAlign: "center",
+    color: colors.muted,
+  },
+  body: { flex: 1, minHeight: 0 },
+  bodyContent: {
+    paddingHorizontal: 16,
+    paddingTop: 12,
+    paddingBottom: 24,
+    gap: 12,
+  },
+  notice: { borderRadius: 12, paddingHorizontal: 12, paddingVertical: 10 },
+  scope: { flexDirection: "row", alignItems: "center", gap: 10 },
+  player: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    minHeight: 96,
+    padding: 12,
+    borderWidth: 1,
+    borderColor: colors.line,
+    backgroundColor: "#fff",
+    borderRadius: 18,
+  },
+  stepper: { flexDirection: "row", alignItems: "center", gap: 4 },
+  step: {
+    width: 48,
+    height: 48,
+    borderRadius: 13,
+    borderWidth: 1,
+    borderColor: colors.line,
+    backgroundColor: "#F5F6F2",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  stepPlus: { backgroundColor: "#174E3F", borderColor: "#174E3F" },
+  scoreNumber: { minWidth: 42, alignItems: "center", justifyContent: "center" },
+  strokes: {
+    fontSize: 30,
+    lineHeight: 36,
+    fontWeight: "800",
+    fontVariant: ["tabular-nums"],
+  },
+  deleteAction: {
+    minHeight: 48,
+    justifyContent: "center",
+    alignItems: "center",
+    marginTop: 2,
+  },
+});

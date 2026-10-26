@@ -1,1 +1,5 @@
-{"ios":{"NSCameraUsageDescription":"Use the camera to scan a companion’s personal QR. No photos or videos are saved."}}
+{
+  "ios": {
+    "NSCameraUsageDescription": "Use the camera to scan personal and round QR codes. No photos or videos are saved."
+  }
+}

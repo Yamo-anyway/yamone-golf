@@ -29,6 +29,13 @@ import {
   type Env,
 } from "./shared";
 
+import { isWorldCountryCode } from "../../shared/countries";
+import {
+  presentCourse,
+  regionGroupSQL,
+  viewerRegion,
+} from "./course-presentation.js";
+
 type Segment = { name: string; pars: number[] };
 type Course = {
   course_id: string;
@@ -36,6 +43,14 @@ type Course = {
   region: string;
   country_code: string;
   city: string;
+  address: string;
+  phone: string | null;
+  website: string | null;
+  latitude: number | null;
+  longitude: number | null;
+  localized_json: string;
+  region_group: string;
+  list_region?: string;
   segments_json: string;
   version: number;
   source_name: string | null;
@@ -84,14 +99,22 @@ function courseInput(b: Record<string, unknown>) {
   });
   if (new Set(segments.map((s) => s.name)).size !== segments.length)
     throw new ApiError("duplicate_segment");
+  const countryCode =
+    b.country_code === undefined
+      ? ""
+      : text(b.country_code, 2, true).toUpperCase();
+  if (countryCode && !isWorldCountryCode(countryCode))
+    throw new ApiError("invalid_country");
   return {
+    country_code: countryCode,
     name: text(b.name, 80),
     region: text(b.region ?? "", 80, true),
     segments,
   };
 }
-function courseView(c: Course) {
+function courseView(c: Course, viewer = "") {
   return {
+    ...presentCourse(c, viewer),
     course_id: c.course_id,
     name: c.name,
     region: c.region,
@@ -101,13 +124,20 @@ function courseView(c: Course) {
     version: c.version,
     source_name: c.source_name,
     source_url: c.source_url,
+    address: c.address,
+    phone: c.phone,
+    website: c.website,
+    latitude: c.latitude,
+    longitude: c.longitude,
     managed_by_admin: c.managed_by_admin === 1,
   };
 }
 async function getCourse(env: Env, id: string) {
   const c = await stmt(
     env,
-    "SELECT * FROM courses WHERE course_id=? AND active=1",
+    `SELECT *, ${regionGroupSQL()} AS list_region FROM courses
+     WHERE course_id=? AND active=1
+       AND (country_code='' OR COALESCE((SELECT enabled FROM country_course_settings s WHERE s.country_code=courses.country_code),1)=1)`,
     id,
   ).first<Course>();
   if (!c) throw new ApiError("course_not_found", 404);
@@ -137,16 +167,24 @@ async function action(env: Env, d: Device, id: string) {
   if (!a) throw new ApiError("not_found", 404);
   return a;
 }
-async function mine(env: Env, d: Device) {
+async function mine(env: Env, d: Device, viewer = "") {
   // A single SQL statement gives list rows and version from one snapshot.
   const row = await stmt(
     env,
     `SELECT COALESCE((SELECT version FROM course_lists WHERE user_id=?),0) AS version,
-    (SELECT json_group_array(json(item)) FROM (SELECT json_object('course_id',c.course_id,'name',c.name,'region',c.region,'country_code',c.country_code,'city',c.city,'segments',json(c.segments_json),'version',c.version,'source_name',c.source_name,'source_url',c.source_url,'managed_by_admin',c.managed_by_admin=1) AS item FROM user_courses u JOIN courses c ON c.course_id=u.course_id WHERE u.user_id=? AND c.active=1 ORDER BY u.sort_order,c.course_id)) AS items`,
+    (SELECT json_group_array(json(item)) FROM (SELECT json_object('localized_json',c.localized_json,'region_group',c.region_group,'list_region',${regionGroupSQL("c.")},'address',c.address,'phone',c.phone,'website',c.website,'latitude',c.latitude,'longitude',c.longitude,'course_id',c.course_id,'name',c.name,'region',c.region,'country_code',c.country_code,'city',c.city,'segments',json(c.segments_json),'version',c.version,'source_name',c.source_name,'source_url',c.source_url,'managed_by_admin',c.managed_by_admin=1) AS item FROM user_courses u JOIN courses c ON c.course_id=u.course_id WHERE u.user_id=? AND c.active=1 AND (c.country_code='' OR COALESCE((SELECT enabled FROM country_course_settings s WHERE s.country_code=c.country_code),1)=1) ORDER BY u.sort_order,c.course_id)) AS items`,
     d.user_id,
     d.user_id,
   ).first<{ version: number; items: string }>();
-  return { version: row!.version, courses: JSON.parse(row!.items) };
+  return {
+    version: row!.version,
+    courses: (
+      JSON.parse(row!.items) as (Course & { segments: Segment[] })[]
+    ).map((c) => {
+      const { localized_json, ...raw } = c;
+      return { ...raw, ...presentCourse(c, viewer) };
+    }),
+  };
 }
 const freeCheck = (d: Device): Check => ({
   sql: "SELECT 1 WHERE NOT EXISTS(SELECT 1 FROM active_round_users WHERE user_id=?)",
@@ -354,12 +392,14 @@ export async function golfRoute(request: Request, env: Env): Promise<Response> {
       throw new ApiError("invalid_request");
     const rows = await stmt(
       env,
-      "SELECT * FROM courses WHERE active=1 AND instr(lower(name||' '||region||' '||city),lower(?))>0 ORDER BY name,course_id LIMIT 31 OFFSET ?",
+      "SELECT * FROM courses WHERE active=1 AND (country_code='' OR COALESCE((SELECT enabled FROM country_course_settings s WHERE s.country_code=courses.country_code),1)=1) AND instr(lower(name||' '||region||' '||city||' '||address||' '||localized_json),lower(?))>0 ORDER BY name,course_id LIMIT 31 OFFSET ?",
       q,
       offset,
     ).all<Course>();
     return json({
-      courses: rows.results.slice(0, 30).map(courseView),
+      courses: rows.results
+        .slice(0, 30)
+        .map((row) => courseView(row, viewerRegion(request))),
       next_offset: rows.results.length > 30 ? offset + 30 : null,
     });
   }
@@ -377,10 +417,11 @@ export async function golfRoute(request: Request, env: Env): Promise<Response> {
         old.created_by !== d.user_id ||
         old.name !== v.name ||
         old.region !== v.region ||
+        old.country_code !== v.country_code ||
         old.segments_json !== JSON.stringify(v.segments)
       )
         throw new ApiError("request_reused", 409);
-      return json({ course: courseView(old) });
+      return json({ course: courseView(old, viewerRegion(request)) });
     }
     await atomic(
       env,
@@ -389,10 +430,11 @@ export async function golfRoute(request: Request, env: Env): Promise<Response> {
       [
         stmt(
           env,
-          "INSERT INTO courses(course_id,name,region,segments_json,created_by,created_at,updated_at) VALUES(?,?,?,?,?,?,?)",
+          "INSERT INTO courses(course_id,name,region,country_code,segments_json,created_by,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?)",
           id,
           v.name,
           v.region,
+          v.country_code,
           JSON.stringify(v.segments),
           d.user_id,
           now(),
@@ -400,7 +442,10 @@ export async function golfRoute(request: Request, env: Env): Promise<Response> {
         ),
       ],
     );
-    return json({ course: courseView(await getCourse(env, id)) }, 201);
+    return json(
+      { course: courseView(await getCourse(env, id), viewerRegion(request)) },
+      201,
+    );
   }
   const courseMatch = path.match(/^\/api\/courses\/([^/]+)$/);
   if (courseMatch && ["GET", "PATCH"].includes(method)) {
@@ -424,9 +469,10 @@ export async function golfRoute(request: Request, env: Env): Promise<Response> {
         [
           stmt(
             env,
-            "UPDATE courses SET name=?,region=?,segments_json=?,version=version+1,updated_at=? WHERE course_id=?",
+            "UPDATE courses SET name=?,region=?,country_code=?,segments_json=?,version=version+1,updated_at=? WHERE course_id=?",
             v.name,
             v.region,
+            v.country_code,
             JSON.stringify(v.segments),
             now(),
             id,
@@ -435,16 +481,18 @@ export async function golfRoute(request: Request, env: Env): Promise<Response> {
         "course_changed",
       );
     }
-    return json({ course: courseView(await getCourse(env, id)) });
+    return json({
+      course: courseView(await getCourse(env, id), viewerRegion(request)),
+    });
   }
   if (path === "/api/me/courses" && method === "GET")
-    return json(await mine(env, d));
+    return json(await mine(env, d, viewerRegion(request)));
   if (path === "/api/me/courses" && method === "PATCH") {
     const b = await body(request),
       version = revision(b.version);
-    const current = await mine(env, d);
+    const current = await mine(env, d, viewerRegion(request));
     if (current.version !== version) throw new ApiError("list_changed", 409);
-    let ids: string[] = current.courses.map((c: Course) => c.course_id);
+    let ids: string[] = current.courses.map((c) => c.course_id);
     if (b.action === "add") {
       const id = uid(b.course_id);
       await getCourse(env, id);
@@ -491,7 +539,7 @@ export async function golfRoute(request: Request, env: Env): Promise<Response> {
       ],
       "list_changed",
     );
-    return json(await mine(env, d));
+    return json(await mine(env, d, viewerRegion(request)));
   }
   if (path === "/api/home" && method === "GET") {
     const r = await activeRound(env, d.user_id);
@@ -596,6 +644,11 @@ export async function golfRoute(request: Request, env: Env): Promise<Response> {
           city: c.city,
           source_name: c.source_name,
           source_url: c.source_url,
+          address: c.address,
+          phone: c.phone,
+          website: c.website,
+          latitude: c.latitude,
+          longitude: c.longitude,
           managed_by_admin: c.managed_by_admin === 1,
           segments: selected,
         },

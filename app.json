@@ -42,7 +42,7 @@
       [
         "expo-camera",
         {
-          "cameraPermission": "Use the camera to scan a personal QR.",
+          "cameraPermission": "Use the camera to scan personal and round QR codes.",
           "microphonePermission": false,
           "recordAudioAndroid": false,
           "barcodeScannerEnabled": true
