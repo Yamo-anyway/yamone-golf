@@ -41,9 +41,21 @@ npm run export:web
 npm run test:ui -- tests/assets-ui.ts
 ```
 
-`design/app-preview.png`는 로컬 테스트 데이터로 실행한 앱 화면 3개를 모은 이미지다. `tests/assets-ui.ts`와 `tests/mobile-redesign-ui.ts` 실행 후 `node design/render-app-preview.mjs`로 다시 만든다.
+`design/app-preview.png`는 로컬 테스트 데이터로 실행한 앱 화면 3개를 모은 이미지다. `tests/assets-ui.ts` 실행 후 `node design/render-app-preview.mjs`로 다시 만든다.
 
 `design/asset-kit.png`는 실제 React Native 공통 컴포넌트를 웹으로 렌더링한 전체 보드다. `design/asset-gallery.tsx`는 검토용이며 앱 라우트나 사용자 메뉴에 들어가지 않는다. 미리보기 번들과 임시 검증 데이터는 `.tmp/`, `qa/`에 생성한다. `PLAYWRIGHT_EXECUTABLE_PATH`는 시스템 브라우저 경로가 필요한 환경에서만 설정한다.
+
+## 한국어·영어 제작물
+
+에셋 보드의 제목·버튼·입력 안내·스코어 설명·상태 문구를 `design/gallery-copy.ts`에서 한국어/영어로 제공한다. 앱은 기존 `src/ui/locales/ko.ts`·`en.ts`를 사용한다. 아이콘·로고·안내 그림에는 언어별 문구가 없으므로 같은 벡터를 공유하고 텍스트만 언어 설정에 따라 바뀐다.
+
+| 제작물                  | 한국어                                    | 영어                                      |
+| ----------------------- | ----------------------------------------- | ----------------------------------------- |
+| 전체 에셋 보드          | `design/asset-kit.png`                    | `design/asset-kit-en.png`                 |
+| 실제 앱 적용 화면       | `design/app-preview.png`                  | `design/app-preview-en.png`               |
+| 조작 가능한 검토용 HTML | `.tmp/asset-gallery/design/index-ko.html` | `.tmp/asset-gallery/design/index-en.html` |
+
+`npm run assets:gallery`로 HTML 두 개를 함께 생성한다. `npm run test:ui -- tests/assets-ui.ts`는 두 언어의 보드와 실제 시작·골프장·기록·점수 입력/저장 화면을 확인하고 캡처한다. 적용 화면은 `node design/render-app-preview.mjs`와 `node design/render-app-preview.mjs --en`으로 각각 생성한다. 앱은 휴대폰 언어를 기본으로 사용하고, 내 정보의 한국어/English 선택이 우선하며 재시작해도 유지된다.
 
 ## 범위와 후속 작업
 

@@ -26,8 +26,12 @@ const result = await build({
   define: { "process.env.NODE_ENV": '"production"' },
 });
 const css = await readFile("design/gallery.css", "utf8");
-await writeFile(
-  ".tmp/asset-gallery/design/index.html",
-  `<!doctype html><html lang="ko"><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>YAMONE GOLF Asset Kit</title><style>${css}</style><div id="root"></div><script>${result.outputFiles[0].text}</script></html>`,
+for (const language of ["ko", "en"]) {
+  const html = `<!doctype html><html lang="${language}"><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>YAMONE GOLF Asset Kit · ${language.toUpperCase()}</title><style>${css}</style><div id="root"></div><script>${result.outputFiles[0].text}</script></html>`;
+  await writeFile(`.tmp/asset-gallery/design/index-${language}.html`, html);
+  if (language === "ko")
+    await writeFile(".tmp/asset-gallery/design/index.html", html);
+}
+console.log(
+  "Gallery: .tmp/asset-gallery/design/index-ko.html and index-en.html",
 );
-console.log("Gallery: .tmp/asset-gallery/design/index.html");

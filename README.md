@@ -3,7 +3,7 @@
 2026-10-26 기준 통합 개발 브랜치입니다. 앱의 방 생성·QR·고정 입력 개선안과 운영 관리자 0.3.22의 후속 기능을 하나의 프로젝트로 연결했습니다. 모바일 패키지는 0.3.12, Worker는 0.3.22이며 정식 출시 버전이 아닙니다.
 
 - [2단계 홀 입력·스코어카드 흐름](docs/STEP2_SCORECARD_FLOW_20261026.md): 삭제 초안·저장/취소·카드 복귀·홀 클릭 진입을 반영하고 검증했습니다.
-- [3단계 앱 에셋·버튼](docs/STEP3_APP_ASSETS_20261026.md): 아이콘 43종·안내 그림 6종·버튼 상태와 플랫폼 에셋을 제작하고 적용했습니다. [전체 보드](design/asset-kit.png)를 볼 수 있습니다. 다음은 골프장 데이터·관리자 마무리입니다.
+- [3단계 앱 에셋·버튼](docs/STEP3_APP_ASSETS_20261026.md): 아이콘 43종·안내 그림 6종·버튼 상태와 플랫폼 에셋을 제작하고 적용했습니다. 전체 보드 [한국어](design/asset-kit.png)·[English](design/asset-kit-en.png), 앱 적용 화면 [한국어](design/app-preview.png)·[English](design/app-preview-en.png)를 볼 수 있습니다. 다음은 골프장 데이터·관리자 마무리입니다.
 - 작업 상태·다음 순서: [WORK_PLAN](docs/WORK_PLAN.md)
 - 기준 소스·복구 방식·운영 DB 적용 주의: [통합 체크포인트](docs/SOURCE_INTEGRATION_20261026.md)
 - 검증 결과·한계: [VALIDATION](docs/VALIDATION.md)
