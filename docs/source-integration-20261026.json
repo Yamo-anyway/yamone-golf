@@ -1,0 +1,18 @@
+{
+  "source": "yamone-golf-admin-0.3.22.zip",
+  "archive_sha256": "1e50999e20e161e1f03798265cf0af3b39e137c77c2632d315783c2f32d2b56a",
+  "source_worker_sha256": "d3db70388108e73849757160d57cce331f56be45c83c255bd4a45ddc91c8540f",
+  "source_presentation_sha256": "5676921e8a7cd8861cce3e3132769849fc45cb735457f36a2f66bc975c97263e",
+  "mobile_head": "63cc63c51f4e565819ee48452e5a31651c1be35f",
+  "base_head": "d718935844eacbda0a02c0a827012efabd763099",
+  "excluded_scripts": [
+    "20261006_philippines_refresh.sql",
+    "20261007_admin_course_samples.sql"
+  ],
+  "production_mutations": false,
+  "observed_health": {
+    "status": "ok",
+    "version": "0.3.22",
+    "environment": "production"
+  }
+}

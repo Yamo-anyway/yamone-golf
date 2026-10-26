@@ -7,6 +7,10 @@ export type Course = {
   course_id: string;
   name: string;
   region: string;
+  display_name?: string;
+  display_address?: string;
+  region_group?: string;
+  address?: string;
   country_code?: string;
   city?: string;
   source_name?: string | null;
@@ -102,9 +106,14 @@ export const golf = {
   ) =>
     request<EndView>("/api/rounds/" + id + "/end-permissions", "POST", value),
   home: () => request<HomeData>("/api/home"),
-  courses: (q = "", offset = 0) =>
+  courses: (q = "", offset = 0, country = "") =>
     request<{ courses: Course[]; next_offset: number | null }>(
-      "/api/courses?q=" + encodeURIComponent(q) + "&offset=" + offset,
+      "/api/courses?q=" +
+        encodeURIComponent(q) +
+        "&offset=" +
+        offset +
+        "&country=" +
+        encodeURIComponent(country),
     ),
   course: (id: string) => request<{ course: Course }>("/api/courses/" + id),
   saveCourse: (c: Course, creating: boolean) =>

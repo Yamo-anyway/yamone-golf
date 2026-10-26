@@ -1,0 +1,33 @@
+/** Shared by native components and the exportable asset catalogue. */
+export const colors = {
+  ink: "#163C34",
+  muted: "#68766F",
+  green: "#174E3F",
+  greenPressed: "#103D30",
+  mint: "#E9EFE8",
+  lime: "#DAEE94",
+  paper: "#F5F6F2",
+  line: "#DFE5DE",
+  error: "#A13636",
+  errorSoft: "#F8EDEC",
+  white: "#FFFFFF",
+  birdie: "#AE483C",
+  bogey: "#3B637D",
+  pending: "#76551B",
+  pendingSoft: "#F8F1DE",
+};
+export const ui = {
+  touch: 48,
+  button: 52,
+  radius: 12,
+  cardRadius: 16,
+  iconStroke: 1.8,
+  type: {
+    body: 16,
+    bodyLine: 24,
+    label: 14,
+    caption: 13,
+    title: 27,
+    titleLine: 35,
+  },
+};

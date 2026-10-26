@@ -48,3 +48,7 @@ npx wrangler secret put EMAIL_TOKEN_SECRET --env production
 ## 아직 완료로 보지 않는 항목
 
 Android 메일 앱의 링크로 앱에 복귀, 앱 강제 종료·재실행, 실제 두 Android 기기 이전은 설치 APK에서 별도 QA가 필요합니다. 서버 API 검증은 네이티브 생명주기 증거를 대체하지 않습니다.
+
+## 2026-10-27 운영 설정 보완
+
+운영 환경에서는 mock/잘못된 EMAIL_MODE와 필요한 Resend 설정 누락을 `email_not_configured` 503으로 차단한다. 실제 발송 없이 성공 상태를 만들지 않으며 상태 API는 configured=false를 반환한다. 만료 인증/복구, 성공 코드 재사용 차단과 원래 성공 요청 재확인을 로컬에서 다시 검증했다. 이번에는 실제 메일 발송이나 운영 secret 변경을 하지 않았다. 상세는 STEP5_OPERATIONS_20261027.md를 따른다.

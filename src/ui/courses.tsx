@@ -1,31 +1,86 @@
+import { deviceCountry } from "../data/device-country";
+import { CountryPicker } from "./country-picker";
+import { countryName, courseName } from "../data/course-presentation";
+import { EmptyState } from "./state-artwork";
+import { RoundSteps } from "./round-flow";
 import { DragRow } from "./drag-row";
+import { Icon } from "./icons";
 import React, { useRef, useState } from "react";
 import { Linking, Pressable, View } from "react-native";
 import { router, useLocalSearchParams } from "expo-router";
 import * as Crypto from "expo-crypto";
 import { golf, type Course } from "../data/golf";
 import { useSession } from "./session";
-import { Button, Card, colors, Field, styles, Txt } from "./components";
+import {
+  Button,
+  Card,
+  colors,
+  Field,
+  IconButton,
+  styles,
+  Txt,
+} from "./components";
 import { confirm, useDraftGuard, useLoad, useTask } from "./golf-hooks";
 export function Problem({ text }: { text: string }) {
   return text ? (
-    <Txt accessibilityRole="alert" style={{ color: colors.error }}>
-      {text}
-    </Txt>
+    <View
+      accessibilityRole="alert"
+      style={{
+        flexDirection: "row",
+        gap: 8,
+        padding: 12,
+        borderRadius: 12,
+        backgroundColor: colors.errorSoft,
+        alignItems: "flex-start",
+      }}
+    >
+      <Icon name="warning" color={colors.error} size={20} />
+      <Txt style={{ color: colors.error, flex: 1 }}>{text}</Txt>
+    </View>
   ) : null;
 }
-export function Heading({ title }: { title: string }) {
+export function Heading({
+  title,
+  onBack,
+}: {
+  title: string;
+  onBack?: () => void;
+}) {
   const { t } = useSession();
   return (
-    <View style={{ gap: 12 }}>
-      <Button
+    <View
+      style={{
+        flexDirection: "row",
+        alignItems: "center",
+        gap: 10,
+        minHeight: 52,
+      }}
+    >
+      <IconButton
         label={t("back")}
+        iconName="chevron-left"
         secondary
+        size="compact"
         onPress={() =>
-          router.canGoBack() ? router.back() : router.dismissTo("/")
+          onBack
+            ? onBack()
+            : router.canGoBack()
+              ? router.back()
+              : router.dismissTo("/")
         }
       />
-      <Txt style={styles.title}>{title}</Txt>
+      <Txt
+        accessibilityRole="header"
+        style={{
+          flex: 1,
+          fontSize: 23,
+          lineHeight: 30,
+          fontWeight: "800",
+          letterSpacing: -0.6,
+        }}
+      >
+        {title}
+      </Txt>
     </View>
   );
 }
@@ -49,20 +104,24 @@ function CourseSource({ course }: { course: Course }) {
   );
 }
 export function CoursesScreen() {
-  const { t } = useSession();
+  const { t, lang } = useSession();
   const { select } = useLocalSearchParams<{ select?: string }>();
   const mine = useLoad(golf.mine),
     task = useTask();
   const [publicMode, setPublicMode] = useState(false),
     [query, setQuery] = useState(""),
     [searched, setSearched] = useState(""),
+    [country, setCountry] = useState(""),
+    [searchedCountry, setSearchedCountry] = useState(""),
     [results, setResults] = useState<Course[] | null>(null),
     [next, setNext] = useState<number | null>(null);
   const heights = useRef<Record<string, number>>({});
   async function search(offset = 0) {
     await task.run(async () => {
       const q = offset ? searched : query;
-      const result = await golf.courses(q, offset);
+      const selectedCountry = offset ? searchedCountry : country;
+      const result = await golf.courses(q, offset, selectedCountry);
+      setSearchedCountry(selectedCountry);
       setSearched(q);
       setResults((current) =>
         offset ? [...(current ?? []), ...result.courses] : result.courses,
@@ -104,17 +163,37 @@ export function CoursesScreen() {
     );
     return (
       <>
-        <Txt style={{ fontSize: 21, lineHeight: 29, fontWeight: "700" }}>
-          {c.name}
-        </Txt>
+        <View
+          style={{ flexDirection: "row", gap: 12, alignItems: "flex-start" }}
+        >
+          <View
+            style={{
+              width: 44,
+              height: 44,
+              borderRadius: 14,
+              backgroundColor: colors.mint,
+              alignItems: "center",
+              justifyContent: "center",
+            }}
+          >
+            <Icon name="flag" size={23} color={colors.green} />
+          </View>
+          <Txt
+            style={{
+              flex: 1,
+              fontSize: 20,
+              lineHeight: 28,
+              fontWeight: "800",
+              letterSpacing: -0.4,
+            }}
+          >
+            {courseName(c)}
+          </Txt>
+        </View>
         <Txt style={{ color: colors.muted }}>
           {[
             c.city || c.region,
-            c.country_code === "KR"
-              ? t("countryKorea")
-              : c.country_code === "PH"
-                ? t("countryPhilippines")
-                : "",
+            c.country_code ? countryName(c.country_code, lang) : "",
           ]
             .filter(Boolean)
             .join(", ")}{" "}
@@ -181,7 +260,8 @@ export function CoursesScreen() {
             </View>
             <Button
               label={t("removeMine")}
-              secondary
+              quiet
+              danger
               disabled={task.busy}
               onPress={() =>
                 void confirm(
@@ -203,6 +283,7 @@ export function CoursesScreen() {
   return (
     <>
       <Heading title={t(select === "1" ? "selectCourse" : "courses")} />
+      {select === "1" && <RoundSteps step={0} />}
       <View style={styles.row}>
         <View style={{ flex: 1 }}>
           <Button
@@ -226,8 +307,18 @@ export function CoursesScreen() {
       <Problem text={task.errorText || mine.errorText} />
       {publicMode ? (
         <>
+          <CountryPicker
+            value={country}
+            allowAll
+            disabled={task.busy}
+            testID="course-country-filter"
+            onChange={setCountry}
+          />
           <Field
             label={t("searchHint")}
+            leadingIcon="search"
+            placeholder={t("courseName")}
+            returnKeyType="search"
             value={query}
             onChangeText={setQuery}
             testID="course-search"
@@ -235,6 +326,7 @@ export function CoursesScreen() {
           />
           <Button
             label={t("search")}
+            iconName="search"
             busy={task.busy}
             onPress={() => void search()}
           />
@@ -244,20 +336,26 @@ export function CoursesScreen() {
           <Txt style={{ color: colors.muted }}>{t("sortHint")}</Txt>
           <Button
             label={t("refresh")}
-            secondary
+            iconName="refresh"
+            quiet
             onPress={() => void mine.reload()}
           />
         </>
       )}
       <Button
         label={t("newCourse")}
+        secondary
+        icon={<Icon name="plus" size={20} color={colors.green} />}
         testID="new-course"
         onPress={() => router.push("/course-edit")}
       />
       {!visible ? (
         <Txt>{t("loading")}</Txt>
       ) : visible.length === 0 ? (
-        <Txt>{t("noCourses")}</Txt>
+        <EmptyState
+          kind={publicMode ? "search" : "courses"}
+          title={t("noCourses")}
+        />
       ) : (
         visible.map((c, i) =>
           publicMode ? (
@@ -265,7 +363,7 @@ export function CoursesScreen() {
           ) : (
             <DragRow
               key={c.course_id}
-              label={t("drag") + " " + c.name}
+              label={t("drag") + " " + courseName(c)}
               disabled={task.busy}
               onDrop={(dy) => drop(i, dy)}
               onHeight={(height) => {
@@ -301,6 +399,7 @@ export function CourseEditor() {
       course_id: createId,
       name: "",
       region: "",
+      country_code: deviceCountry(),
       version: 0,
       segments: [{ name: "OUT", pars: Array(9).fill(4) }],
     };
@@ -330,9 +429,19 @@ export function CourseEditor() {
       <CourseSource course={current} />
       <Problem text={task.errorText || loaded.errorText} />
       {id && !loaded.data ? (
-        <Button label={t("retry")} onPress={() => void loaded.reload()} />
+        <Button
+          label={t("retry")}
+          iconName="refresh"
+          onPress={() => void loaded.reload()}
+        />
       ) : (
         <>
+          <CountryPicker
+            value={current.country_code ?? ""}
+            disabled={task.busy || done}
+            testID="course-country"
+            onChange={(country_code) => edit({ ...current, country_code })}
+          />
           <Field
             label={t("courseName")}
             testID="course-name"
@@ -494,6 +603,7 @@ export function CourseEditor() {
           ) : (
             <Button
               label={t("save")}
+              iconName="save"
               testID="save-course"
               busy={task.busy}
               disabled={!canSave}

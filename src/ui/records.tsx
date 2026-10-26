@@ -1,3 +1,5 @@
+import { EmptyState } from "./state-artwork";
+import { FlowNote } from "./round-flow";
 import React, { useRef, useState } from "react";
 import { View } from "react-native";
 import type { RecordFilter } from "../../shared/personal-records";
@@ -11,7 +13,7 @@ import type { AdEvidence } from "../data/ad-config";
 import { presentInterstitial, waitUntilAdForeground } from "../data/mobile-ads";
 import { AdAction, useAdActionLifetime } from "./ad-action";
 import type { Delivery } from "../../shared/records";
-import { Button, Card, colors, Field, Txt } from "./components";
+import { Button, Chip, Card, colors, Field, Txt } from "./components";
 import { Heading, Problem } from "./courses";
 import { useSession } from "./session";
 import { confirm, useLoad, useTask } from "./golf-hooks";
@@ -125,8 +127,20 @@ export function RecordsScreen() {
   return (
     <>
       <Heading title={t("recordsTitle")} />
+      <FlowNote
+        title={
+          lang === "ko"
+            ? "라운드 기록을 내 기록으로"
+            : "Keep a round in your records"
+        }
+      >
+        {lang === "ko"
+          ? "라운드 중 점수 작성은 방의 스코어 입력에서 합니다. 종료 후 ‘기록 받기’를 하면 전체 라운드가 내 기록에 추가됩니다."
+          : "Enter live scores inside the round. After it ends, receive the record to keep the entire round here."}
+      </FlowNote>
       <Button
         label={t("statisticsTitle")}
+        iconName="stats"
         secondary
         testID="open-statistics"
         onPress={() => router.push("/statistics")}
@@ -146,13 +160,18 @@ export function RecordsScreen() {
         {t("recordsToReceive")}
       </Txt>
       {data && !data.inbox.items.length && (
-        <Txt testID="empty-inbox">{t("noRecordsToReceive")}</Txt>
+        <EmptyState
+          kind="records"
+          testID="empty-inbox"
+          title={t("noRecordsToReceive")}
+        />
       )}
       {data?.inbox.items.map((v) => (
         <Card key={v.delivery_id}>
           <DeliveryInfo value={v} />
           <Button
             label={t("receiveRecord")}
+            iconName="download"
             testID={"receive-" + v.delivery_id}
             disabled={task.busy}
             onPress={() =>
@@ -205,6 +224,7 @@ export function RecordsScreen() {
       </Txt>
       <Field
         label={t("searchMyRecords")}
+        leadingIcon="search"
         testID="record-search"
         value={search}
         onChangeText={setSearch}
@@ -212,7 +232,7 @@ export function RecordsScreen() {
       />
       <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8 }}>
         {(["all", "statistics", "incomplete", "nine"] as const).map((key) => (
-          <Button
+          <Chip
             key={key}
             label={t(
               (
@@ -224,7 +244,7 @@ export function RecordsScreen() {
                 } as const
               )[key],
             )}
-            secondary={scope !== key}
+            selected={scope === key}
             disabled={task.busy}
             testID={"filter-" + key}
             onPress={() => setScope(key)}
@@ -233,6 +253,7 @@ export function RecordsScreen() {
       </View>
       <Button
         label={t("search")}
+        iconName="search"
         testID="search-records"
         disabled={task.busy || !data}
         onPress={() =>
@@ -245,13 +266,17 @@ export function RecordsScreen() {
         }
       />
       {data && !data.mine.items.length && (
-        <Txt testID="empty-records">
-          {t(
+        <EmptyState
+          kind={
+            data.filter.q || data.filter.scope !== "all" ? "search" : "records"
+          }
+          testID="empty-records"
+          title={t(
             data.filter.q || data.filter.scope !== "all"
               ? "noMatchingRecords"
               : "noReceivedRecords",
           )}
-        </Txt>
+        />
       )}
       {data?.mine.items.map((r) => (
         <Card key={r.receipt_id}>
@@ -268,6 +293,7 @@ export function RecordsScreen() {
           </Txt>
           <Button
             label={t("openReceivedRecord")}
+            iconName="scorecard"
             secondary
             testID={"record-" + r.receipt_id}
             onPress={() =>
@@ -297,6 +323,7 @@ export function RecordsScreen() {
       )}
       <Button
         label={t("refresh")}
+        iconName="refresh"
         testID="refresh-records"
         secondary
         disabled={task.busy}
@@ -449,6 +476,7 @@ export function RoundDeliveriesScreen() {
       )}
       <Button
         label={t("refresh")}
+        iconName="refresh"
         testID="refresh-deliveries"
         secondary
         disabled={task.busy}
@@ -552,6 +580,7 @@ export function ReceiveRecordScreen() {
       )}
       <Button
         label={t("retry")}
+        iconName="refresh"
         testID="refresh-receive"
         secondary
         disabled={task.busy}
@@ -676,6 +705,7 @@ export function RecordScreen() {
       )}
       <Button
         label={t("refresh")}
+        iconName="refresh"
         secondary
         testID="refresh-record"
         disabled={task.busy}

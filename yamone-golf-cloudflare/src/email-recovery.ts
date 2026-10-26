@@ -74,7 +74,11 @@ function recoveryCode(value: unknown) {
 
 function emailConfig(env: Env) {
   const mode = env.EMAIL_MODE ?? "disabled";
-  if (mode === "disabled") throw new ApiError("email_not_configured", 503);
+  if (
+    (mode !== "mock" && mode !== "resend") ||
+    (env.ENVIRONMENT === "production" && mode !== "resend")
+  )
+    throw new ApiError("email_not_configured", 503);
   if (!env.EMAIL_TOKEN_SECRET || env.EMAIL_TOKEN_SECRET.length < 32)
     throw new ApiError("email_not_configured", 503);
   if (!env.EMAIL_FROM || !env.EMAIL_APP_LINK)

@@ -153,7 +153,7 @@ async function main() {
     await a.page.getByTestId("keep-draft-and-move").click();
     await a.page
       .getByTestId("current-hole")
-      .filter({ hasText: "홀 2" })
+      .filter({ hasText: "2번홀" })
       .waitFor();
     await a.page.getByTestId("plus-" + second.slot_id).click();
     await a.page
@@ -172,13 +172,15 @@ async function main() {
     await a.page.getByTestId("offline-session").waitFor();
     await a.page
       .getByTestId("current-hole")
-      .filter({ hasText: "홀 2" })
+      .filter({ hasText: "2번홀" })
       .waitFor();
     assert.equal(
       await a.page.getByTestId("score-value-" + second.slot_id).textContent(),
       "5",
     );
     await a.page.getByTestId("save-hole").click();
+    await a.page.waitForURL(base + "/scorecard?id=" + round.round_id);
+    await a.page.goto(scoreURL);
     await a.page
       .getByTestId("score-state-" + second.slot_id)
       .filter({ hasText: "전송 대기" })
@@ -190,11 +192,15 @@ async function main() {
       .filter({ hasText: "5" })
       .waitFor();
     await a.page.getByTestId("save-hole").click();
+    await a.page.waitForURL(base + "/scorecard?id=" + round.round_id);
+    await a.page.goto(scoreURL);
     await a.page
       .getByTestId("queued-holes")
       .filter({ hasText: "2, 3" })
       .waitFor();
-    await a.page.getByRole("tab", { name: "홈", exact: true }).click();
+    // This directly opened task screen returns home through its back arrow.
+    await a.page.getByRole("button", { name: "돌아가기", exact: true }).click();
+    await a.page.waitForURL(base + "/");
     await a.page.reload();
     await a.page.getByTestId("resume-local-" + round.round_id).click();
     await a.page
@@ -252,10 +258,9 @@ async function main() {
     await a.page.getByTestId("hole-2").click();
     await a.page.getByTestId("keep-draft-and-move").click();
     await a.page.getByTestId("confirm-score-conflict").click();
-    await a.page
-      .getByTestId("score-notice")
-      .filter({ hasText: "서버에 저장" })
-      .waitFor();
+    await a.page.waitForURL(base + "/scorecard?id=" + round.round_id);
+    await a.page.goto(scoreURL);
+    await a.page.getByTestId("save-hole").waitFor();
     assert.equal(
       (await call(b.page, root + "/scores")).scores.find(
         (s: any) => s.slot_id === second.slot_id && s.hole === 2,
@@ -276,6 +281,8 @@ async function main() {
     });
     await a.page.getByTestId("hole-5").click();
     await a.page.getByTestId("save-hole").click();
+    await a.page.waitForURL(base + "/scorecard?id=" + round.round_id);
+    await a.page.goto(scoreURL);
     await a.page.getByTestId("queued-holes").filter({ hasText: "5" }).waitFor();
     await a.page.close();
     a.page = await a.page.context().newPage();

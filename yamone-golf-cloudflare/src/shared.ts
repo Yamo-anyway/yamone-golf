@@ -9,6 +9,7 @@ export interface Env {
   EMAIL_TOKEN_SECRET?: string;
   COURSE_ADMIN_TOKEN?: string;
   GOLFCORE_API?: Fetcher;
+  GOLFCORE_API_KEY?: string;
 }
 export type User = {
   user_id: string;

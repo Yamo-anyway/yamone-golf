@@ -170,7 +170,7 @@ test("GolfCore search uses the supported API and review creates unique nine-hole
   assert.equal(called.searchParams.get("country"), "ph");
   assert.equal(called.searchParams.get("coverage"), "scorecard");
   assert.equal(called.searchParams.get("q"), "Manila");
-  assert.match(requests[0].agent ?? "", /^YamoneGolf\/0\.3\.12/);
+  assert.match(requests[0].agent ?? "", /^YamoneGolf\/0\.3\.22/);
 
   const reviewed = await request("/admin/api/golfcore/courses/" + detail.slug);
   assert.equal(reviewed.status, 200);

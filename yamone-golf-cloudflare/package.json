@@ -1,14 +1,15 @@
 {
   "name": "yamone-golf-cloudflare",
-  "version": "0.3.12",
+  "version": "0.3.22",
   "private": true,
   "type": "module",
   "scripts": {
     "dev": "wrangler dev --local --port 8787",
     "db:local": "wrangler d1 migrations apply DB --local",
     "typecheck": "tsc --noEmit",
-    "test": "node --import tsx --test tests/*.test.ts",
-    "deploy:check": "wrangler deploy --dry-run"
+    "test": "node --import tsx --test --test-concurrency=2 tests/*.test.ts tests/*.test.js",
+    "deploy:check": "wrangler deploy --dry-run",
+    "typecheck:presentation": "tsc --ignoreConfig --allowJs --checkJs --noEmit --target es2022 --module nodenext --skipLibCheck src/course-presentation.js"
   },
   "devDependencies": {
     "wrangler": "4.136.3",

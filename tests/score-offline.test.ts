@@ -500,3 +500,69 @@ test("ending and draft discard re-read storage so a second editor cannot silentl
   );
   assert.deepEqual(await b.prepareEnd("r", 5), pending);
 });
+
+test("clearing a saved hole is a local draft across restarts; cancel preserves the server and other holes", async () => {
+  const f = fixture(),
+    s = f.make();
+  f.server.scores = [
+    { slot_id: "a", hole: 1, strokes: 5, version: 1 },
+    { slot_id: "b", hole: 1, strokes: 4, version: 1 },
+    { slot_id: "a", hole: 2, strokes: 6, version: 1 },
+  ];
+  await s.refresh("r");
+  await s.change("r", 2, "b", 1);
+  await s.stageDelete("r", 1);
+  await s.sync();
+  assert.equal(f.requests.length, 0);
+  assert.equal(scoreAt(f.server, "a", 1).strokes, 5);
+  const restarted = f.make();
+  await restarted.open();
+  assert.equal(r(restarted).drafts[1].deleting, true);
+  await restarted.discard("r", 1);
+  assert.equal(r(restarted).drafts[1], undefined);
+  assert.equal(scoreAt(r(restarted).sheet, "a", 1).strokes, 5);
+  assert.equal(r(restarted).drafts[2].rows[1].strokes, 5);
+  assert.equal(f.requests.length, 0);
+});
+
+test("staged deletion only reaches selected players on explicit save and survives offline queue recovery", async () => {
+  const f = fixture(),
+    s = f.make();
+  f.server.scores = [
+    { slot_id: "a", hole: 1, strokes: 5, version: 2 },
+    { slot_id: "b", hole: 1, strokes: 4, version: 1 },
+    { slot_id: "a", hole: 2, strokes: 6, version: 1 },
+  ];
+  f.server.slot_ids = ["a"];
+  await s.refresh("r");
+  await s.stageDelete("r", 1);
+  f.network = true;
+  await s.enqueue("r", 1);
+  await s.sync();
+  assert.deepEqual(r(s).queue[1].write.entries, [
+    { slot_id: "a", strokes: null, version: 2 },
+  ]);
+  const restarted = f.make();
+  await restarted.open();
+  await assert.rejects(restarted.stageDelete("r", 1), {
+    code: "score_pending_locked",
+  });
+  f.network = false;
+  await restarted.sync();
+  assert.equal(scoreAt(f.server, "a", 1).strokes, null);
+  assert.equal(scoreAt(f.server, "b", 1).strokes, 4);
+  assert.equal(scoreAt(f.server, "a", 2).strokes, 6);
+  assert.equal(r(restarted).queue[1], undefined);
+});
+
+test("failed local storage never stages a deletion or changes acknowledged scores", async () => {
+  const f = fixture(),
+    s = f.make();
+  f.server.scores = [{ slot_id: "a", hole: 1, strokes: 5, version: 1 }];
+  await s.refresh("r");
+  f.failure = true;
+  await assert.rejects(s.stageDelete("r", 1), { code: "offline_storage" });
+  assert.equal(r(s).drafts[1], undefined);
+  assert.equal(scoreAt(r(s).sheet, "a", 1).strokes, 5);
+  assert.equal(f.requests.length, 0);
+});

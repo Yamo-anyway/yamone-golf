@@ -20,7 +20,8 @@ import { expireRounds } from "./round-store";
 import { golfRoute } from "./golf";
 import { emailRecoveryRoute } from "./email-recovery";
 import { identityResponse, profile } from "./identity-response";
-import { courseAdminRoute } from "./course-admin";
+import { courseAdminRoute, courseRequestRoute } from "./course-admin";
+import { syncNextGolfCoreCatalogPage } from "./golfcore-sync.recovered.js";
 export type { Env } from "./shared";
 async function register(request: Request, env: Env) {
   const b = await body(request);
@@ -112,11 +113,13 @@ async function route(request: Request, env: Env) {
   const path = new URL(request.url).pathname;
   const admin = await courseAdminRoute(request, env);
   if (admin) return admin;
+  const courseRequest = await courseRequestRoute(request, env);
+  if (courseRequest) return courseRequest;
   if (path === "/health" && request.method === "GET") {
     await env.DB.prepare("SELECT 1 AS ok").first();
     return json({
       status: "ok",
-      version: "0.3.12",
+      version: "0.3.22",
       environment: env.ENVIRONMENT,
       server_time: now(),
     });
@@ -204,7 +207,7 @@ export default {
       response.headers.set("Access-Control-Allow-Credentials", "true");
       response.headers.set(
         "Access-Control-Allow-Headers",
-        "Content-Type, Authorization",
+        "Content-Type, Authorization, X-Device-Region",
       );
       response.headers.set(
         "Access-Control-Allow-Methods",
@@ -227,5 +230,15 @@ export default {
         "DELETE FROM email_recovery_requests WHERE created_at < ?",
       ).bind(now() - 30 * 24 * 60 * 60 * 1000),
     ]);
+    if (env.ENVIRONMENT !== "test") {
+      try {
+        await syncNextGolfCoreCatalogPage(env);
+      } catch (error) {
+        console.error(
+          "GolfCore catalog sync failed",
+          error instanceof ApiError ? error.code : "UnknownError",
+        );
+      }
+    }
   },
 } satisfies ExportedHandler<Env>;

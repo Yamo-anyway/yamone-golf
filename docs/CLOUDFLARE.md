@@ -1,59 +1,54 @@
-# Cloudflare 연결 안내
+# Cloudflare 운영 점검 안내
 
-이번 소스는 로컬 Worker와 D1에서 검증했습니다. 운영 D1 `yamone-golf`는 생성되어 production 설정에 ID가 연결됐지만, 원격 마이그레이션과 Worker 배포는 아직 수행하지 않았습니다. 개발 DB와 운영 DB는 분리합니다.
+2026-10-27: 현재 환경의 Wrangler는 미인증이다. 이 통합본의 운영 DB 대조·마이그레이션·배포는 아직 수행하지 않았다. 운영 health의 0.3.22는 2026-10-26 확인 기록이며 코드 전체의 일치나 DB 구조 검증을 뜻하지 않는다.
 
-v0.3.12는 `0009_course_catalog_admin.sql`까지 사용합니다. 기존 개발 DB에는 `npm run db:local`로 추가 마이그레이션을 적용합니다. 운영 DB에는 현재 `0008`까지만 적용되어 있으며, 아래 관리자 secret을 먼저 준비한 뒤 `0009`와 새 Worker를 적용합니다. 운영 광고와 실기기 QA가 아직 없으므로 현재 버전은 운영 출시 완료가 아닙니다.
+운영 Worker `yamone-golf-api`와 D1 `yamone-golf`는 이미 존재한다. 새 운영 DB를 만들거나 개발 DB ID로 대체하지 않는다. 신규 로컬 DB는 0001~0012를 사용한다. 기존 운영에는 수동 반영된 필드가 있을 수 있어 전체 마이그레이션 일괄 적용 명령을 사용하지 않는다. 특히 0010의 중복 ALTER와 운영 골프장 초기화를 피해야 한다.
 
-## 개발 서버 만들기
+## 1. 인증과 읽기 전용 대조
 
-저장소 루트에서 `cd yamone-golf-cloudflare` 후:
-
-```bash
-npx wrangler login
-npx wrangler d1 create yamone-golf-dev
-```
-
-출력된 실제 `database_id`를 `wrangler.jsonc`의 최상위 `d1_databases`에 넣습니다. 그다음:
+저장소 루트에서, 현재 작업 환경에 Cloudflare 인증을 연결한 다음 실행한다. 인증 정보는 채팅·Git·문서에 붙여 넣지 않는다.
 
 ```bash
-npx wrangler d1 migrations apply DB --remote
-npx wrangler deploy
+npm run db:preflight -- --remote --out .tmp/operations/production-20261027.json
 ```
 
-반환된 Worker HTTPS URL 뒤에 `/health`를 붙여 확인합니다. 앱의 `.env`에서 `EXPO_PUBLIC_API_URL`을 해당 URL로 설정하고 앱 번들을 다시 만듭니다.
+이 명령은 DB 메타데이터·적용 이력·국가 설정·수집 상태만 읽는다. 생성·적용·배포·복원 기능은 없다. 이미 존재하지만 이력에 없는 구조, 제약·인덱스의 차이와 알 수 없는 이력을 검토 항목으로 남긴다. 출력이 일치해도 데이터 값·과거 SQL 체크섬의 일치를 증명하지 않는다. 재실행은 새 보고서 파일명을 쓴다. 상세와 종료 코드는 [5단계 기록](STEP5_OPERATIONS_20261027.md)에 있다.
 
-## 운영 분리
-
-운영 배포 단계에서만 `yamone-golf` D1을 생성하고 `env.production.d1_databases`의 ID를 설정합니다. 개발 ID를 운영 항목에 복사하지 않습니다.
+이후 아래 명령은 **Worker 디렉터리**에서 수행한다.
 
 ```bash
-npx wrangler d1 create yamone-golf
-npx wrangler d1 migrations apply DB --remote --env production
-npx wrangler deploy --env production
+cd yamone-golf-cloudflare
+npx wrangler whoami
+npx wrangler secret list --env production --format json
 ```
 
-현재 운영 D1은 이미 생성되어 있으므로 `d1 create`를 다시 실행하지 않습니다. 코드가 Git에 확정된 다음 마이그레이션 → secret → 배포 순서로 한 단계씩 진행합니다.
+운영 설정에서 ENVIRONMENT=production, EMAIL_MODE=resend, 발신자 `noreply@golf.yamone.net`, 앱 링크 `yamone-golf:///email-recovery`, 10분 Cron과 기존 DB 바인딩을 대조한다. secret 목록에는 `RESEND_API_KEY`, `EMAIL_TOKEN_SECRET`, `COURSE_ADMIN_TOKEN`의 **이름**이 있어야 한다. 이름 존재만으로 값·도메인 인증·실제 발송이 정상이라는 뜻은 아니다. 기존 secret을 임의로 교체하지 않는다. 운영 mock 발송은 차단된다.
 
-복구 이메일 운영 secret은 Git이나 설정 파일에 넣지 않습니다.
+## 2. 변경 전 복구 지점과 export
+
+아래는 기존 운영 DB를 읽는 명령이다. 변경 이력·소스 커밋·UTC 시각과 bookmark를 함께 보관하고, 이미 있는 백업 파일은 새 이름으로 구분한다.
 
 ```bash
-npx wrangler secret put RESEND_API_KEY --env production
-npx wrangler secret put EMAIL_TOKEN_SECRET --env production
+npx wrangler d1 time-travel info DB --env production --json
+npx wrangler d1 export DB --remote --env production --output ../.tmp/operations/prechange-20261027.sql
 ```
 
-`RESEND_API_KEY`에는 Resend에서 만든 `golf.yamone.net` 발송 제한 키를 붙여 넣습니다. `EMAIL_TOKEN_SECRET`은 별도로 생성한 최소 32바이트 난수이며 API 키와 재사용하지 않습니다. 메일 발신자는 `noreply@golf.yamone.net`, 앱 링크는 `yamone-golf:///email-recovery`입니다. 실제 키 값은 명령 출력·스크린샷·문서에 남기지 않습니다.
+SQL export에는 사용자·복구 관련 비공개 데이터가 포함될 수 있으므로 비공개 위치에서 접근을 제한하고 Git이나 PR에 첨부하지 않는다. export 성공만으로 복원 검증이 끝나지 않는다. 별도 빈 로컬/검증 DB에 복원한 뒤 무결성·주요 행·제약·수집 위치·이력을 대조한다. 이번 단계에서는 격리 로컬 D1의 실제 export/import를 검증했다.
 
-골프장 관리자용 토큰도 다른 secret과 재사용하지 않는 최소 32바이트 난수로 등록합니다.
+D1 Time Travel은 기본 제공되며 보관 기간은 요금제에 따라 Free 7일/Paid 30일이다. 현재 계정의 요금제·복구 가능 범위·bookmark를 확인해야 한다. 공식 자료: [Time Travel](https://developers.cloudflare.com/d1/reference/time-travel/), [SQL export/import](https://developers.cloudflare.com/d1/best-practices/import-export-data/).
 
-```bash
-openssl rand -hex 32 | npx wrangler secret put COURSE_ADMIN_TOKEN --env production
-npx wrangler d1 migrations apply DB --remote --env production
-npx wrangler deploy --env production
-```
+운영 Time Travel restore는 현재 DB를 과거 시점으로 교체한다. 새 데이터 유실 구간과 인증 세션 영향, 복구 대상 bookmark, 현재 시점의 추가 export를 검토한 후에만 별도 실행한다. 단순 서버 코드 롤백과 DB 복원은 다르다. 이 단계에서 운영 restore를 실행하지 않는다.
 
-배포 후 `https://yamone-golf-api.yamone-golf.workers.dev/admin`에서 토큰으로 로그인합니다. 토큰은 URL·Git·문서에 넣지 않습니다. 관리자 웹은 토큰을 `sessionStorage`에만 두므로 탭을 닫으면 다시 입력해야 합니다. GolfCore 연동은 별도 API 키가 없으며, 공식 JSON API만 호출하고 각 코스의 출처 URL을 D1과 앱에 보존합니다.
+## 3. 차이 검토 후 반영
 
-Cron은 개발·운영 설정 모두 10분 간격으로 6시간 만료 라운드를 종료하고 요청 제한 버킷을 정리합니다. 종료 시각은 마지막 변경 +6시간으로 기록합니다. 실제 스케줄 실행은 배포 후에만 활성화되며, 로컬 검증에서는 scheduled 핸들러를 직접 호출했습니다. API도 만료를 검사하므로 Cron 실행 전후의 늦은 입력으로 만료 기한을 늘리지 못합니다.
+사전 점검에서 확인한 실제 누락분만 변경안으로 만든다. 수동 적용과 이력 불일치를 확인하지 않은 채 0010을 재실행하거나, 실행하지 않은 파일을 이력에 추가하지 않는다. 변경 전후 스키마·이력·주요 행 수와 외래키를 대조한다. 통합 Worker 배포는 호환되는 DB와 운영 설정이 확인된 뒤 기존 production 환경에 진행한다. 구체적인 변경 SQL은 운영 조회가 끝난 뒤 확정한다.
+
+## 4. 가동·오류 확인
+
+- 공개 `/health`는 기본 D1 연결만 확인한다. 스키마 전체·이메일 발송·Cron 성공을 뜻하지 않는다.
+- Workers 로그에서 Cron 실행 시각과 오류를 확인한다. 이 Worker는 요청 오류의 종류와 GolfCore 수집 오류 코드만 기록하며 토큰/복구 코드/메일 본문을 추가로 출력하지 않는다.
+- 6시간 만료 라운드 잔여 수, 중복 활성 기기 수, 이메일 요청 상태별 집계, 국가별 수집 상태·마지막 성공·위치를 운영 D1에서 확인한다. 문제를 조사할 때도 비공개 주소·코드 전체를 문서에 복사하지 않는다.
+- 운영 관리자 데이터 점검과 실제 앱 검색, 검토 데이터와 원문 수집의 분리를 확인한다. 실제 메일 발송·새 테스트 사용자 생성은 별도 검증 범위를 확정해 진행한다.
 
 ## 앱/웹 인증
 

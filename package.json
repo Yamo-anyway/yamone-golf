@@ -15,6 +15,7 @@
     "expo-network": "~57.0.2",
     "expo-router": "~57.0.22",
     "expo-secure-store": "~57.0.4",
+    "expo-splash-screen": "~57.0.10",
     "expo-status-bar": "~57.0.1",
     "qrcode": "^1.5.4",
     "react": "19.2.3",
@@ -30,6 +31,7 @@
     "@types/node": "^26.6.2",
     "@types/qrcode": "^1.5.6",
     "@types/react": "~19.2.2",
+    "@types/react-dom": "~19.2.0",
     "eslint": "^9.39.5",
     "eslint-config-expo": "~57.0.2",
     "playwright": "^1.63.0",
@@ -50,8 +52,12 @@
     "export:android": "expo export --platform android --output-dir dist-android",
     "server": "npm run dev --workspace yamone-golf-cloudflare",
     "db:local": "npm run db:local --workspace yamone-golf-cloudflare",
+    "db:preflight": "node --import tsx scripts/db-preflight.ts",
     "preview": "node --import tsx scripts/preview.ts",
-    "format": "prettier --write src tests scripts docs yamone-golf-cloudflare/src yamone-golf-cloudflare/tests"
+    "format": "prettier --write src tests scripts docs yamone-golf-cloudflare/src yamone-golf-cloudflare/tests",
+    "assets:export": "node --import tsx scripts/export-assets.ts",
+    "assets:check": "node --import tsx scripts/check-assets.ts",
+    "assets:gallery": "node design/build-gallery.mjs"
   },
   "private": true,
   "workspaces": [

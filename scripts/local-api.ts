@@ -23,6 +23,7 @@ async function main() {
       d1Databases: ["DB"],
       bindings: {
         ENVIRONMENT: "ui-test",
+        COURSE_ADMIN_TOKEN: process.env.UI_COURSE_ADMIN_TOKEN ?? "",
         ALLOWED_ORIGINS: `http://localhost:${previewPort},http://127.0.0.1:${previewPort}`,
         EMAIL_MODE: "mock",
         EMAIL_FROM: "Yamone Golf <noreply@golf.yamone.net>",
